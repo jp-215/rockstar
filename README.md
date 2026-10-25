@@ -124,7 +124,7 @@ baseline from the prior 30 minutes (baseline counts are scaled to the window len
 only when the trend changes and no call is in flight; otherwise the template.
 
 **Manager** (`agents/manager.ts`). On each report, if no promo is live or pending and the cooldown
-(10 sim-minutes) has passed: `trend === 'up'` and (window sales ≤ scaled baseline sales, or
+(10 sim-minutes) has passed and the baseline covers ≥ 3 sim-minutes: `trend === 'up'` and (window sales ≤ scaled baseline sales, or
 conversion < 0.8× baseline conversion) and ≥ 20 passersby in the window → posts a brief to Slack
 and publishes `manager.opportunity`. On a draft it posts an approval card. On `comms.slack.action` it
 publishes `promo.approved` or `promo.rejected`. After `promo.live` it snapshots the pre-promo
@@ -183,8 +183,9 @@ Every call is traced as `llm.call`.
   sim-seconds, forwards `purchased`, applies `display.set/clear` to the campaign surfaces, and
   obeys `sim.control`. HUD shows mesh connection and provider.
 - **Scenarios** (`src/config.ts`): regular, rainy (low traffic, overcast, umbrellas), dinner rush
-  (high traffic, dusk, lamps), dead hours (night). Each sets spawn rate, interest and speed
-  multipliers, weather and lighting.
+  (high traffic, dusk, lamps), dead hours (night). Each sets spawn rate, interest, speed and
+  purchase multipliers, weather and lighting. Dinner rush deliberately has a low purchase
+  multiplier (`buyMul: 0.3`): crowds peek in but few buy, which is the signal the manager acts on.
 
 ## Extending
 

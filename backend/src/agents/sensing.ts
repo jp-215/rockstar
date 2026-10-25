@@ -57,7 +57,7 @@ export class SensingAgent {
         trend = r >= 1.3 ? 'up' : r <= 0.7 ? 'down' : 'flat';
       } else if (footfallPerMin > 5) trend = 'up';
     }
-    return { simTime: now, footfallPerMin, lookRate: passersby ? lookers / passersby : 0, walkIns, sales: sw.length, revenue: sum(sw, (s) => s.amount), conversion, baseline, trend };
+    return { simTime: now, footfallPerMin, lookRate: passersby ? lookers / passersby : 0, walkIns, sales: sw.length, revenue: sum(sw, (s) => s.amount), conversion, baseline, baselineSec: baseSec >= 60 ? baseSec : 0, trend };
   }
 
   private async report(now: number) {

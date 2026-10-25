@@ -24,6 +24,7 @@ export interface MetricsSnapshot {
   revenue: number;         // $ in window
   conversion: number;      // sales / walkIns (0 when no walk-ins)
   baseline: { footfallPerMin: number; sales: number; conversion: number };
+  baselineSec: number;     // how much history the baseline covers (0 = none yet)
   trend: 'up' | 'flat' | 'down';
 }
 

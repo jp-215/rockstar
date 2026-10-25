@@ -13,6 +13,7 @@ export class Crowd {
   spawnPerMin = CONFIG.sim.spawnPerMin;
   interestMul = 1;
   speedMul = 1;
+  buyMul = 1;
   raining = false;
   showRays = true;
   onRemoved: ((p: Pedestrian) => void) | null = null;
@@ -53,7 +54,7 @@ export class Crowd {
 
     for (const p of peds) {
       const wasInside = p.isInside;
-      const target = updateBehavior(p, dt, { rng: this.rng, storefront: this.storefront, t, emit });
+      const target = updateBehavior(p, dt, { rng: this.rng, storefront: this.storefront, t, buyMul: this.buyMul, emit });
       if (!p.selfMoving && p.state !== 'done') {
         p.x += Math.cos(p.heading) * p.speed * dt;
         p.z += (p.laneZ - p.z) * Math.min(1, 1.5 * dt);

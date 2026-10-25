@@ -6,6 +6,7 @@ import type { MetricsSnapshot, Promo } from '../../../shared/mesh-types.ts';
 
 const COOLDOWN = 600;          // sim-seconds between opportunities
 const MIN_PASSERSBY = 20;
+const MIN_BASELINE_SEC = 180;  // don't judge against a baseline that is mostly start-up noise
 const LIFT_AFTER = 300;        // sim-seconds after promo live before reporting even without a sale
 
 const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
@@ -32,6 +33,7 @@ export class ManagerAgent {
     if (this.live) { await this.maybeLift(m, traceId); return; }
     if (this.pending) return;
     if (m.simTime - this.lastOpportunityAt < COOLDOWN) return;
+    if (m.baselineSec < MIN_BASELINE_SEC) return;
     const passersby = m.footfallPerMin * 5;
     const salesFlat = m.sales <= Math.max(m.baseline.sales, 0) + 0.5;
     const conversionDown = m.baseline.conversion > 0 && m.conversion < 0.8 * m.baseline.conversion;

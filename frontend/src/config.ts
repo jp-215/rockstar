@@ -41,11 +41,13 @@ export const CONFIG = {
     walkSpeed: 0.9,
   },
   scenarios: {
-    regular: { label: 'Regular day', spawnPerMin: 40, interestMul: 1.0, speedMul: 1.0, rain: false, light: 'day' },
-    rainy:   { label: 'Rainy day',   spawnPerMin: 14, interestMul: 0.6, speedMul: 1.2, rain: true,  light: 'overcast' },
-    rush:    { label: 'Dinner rush', spawnPerMin: 110, interestMul: 1.3, speedMul: 0.95, rain: false, light: 'dusk' },
-    dead:    { label: 'Dead hours',  spawnPerMin: 6,  interestMul: 0.9, speedMul: 1.0, rain: false, light: 'night' },
-  } as Record<string, { label: string; spawnPerMin: number; interestMul: number; speedMul: number; rain: boolean; light: LightPreset }>,
+    // buyMul: purchase propensity once inside. Dinner rush is deliberately low: crowds browse and
+    // peek in but few buy, which is the "traffic up, sales flat" signal the manager agent looks for.
+    regular: { label: 'Regular day', spawnPerMin: 40, interestMul: 1.0, speedMul: 1.0, buyMul: 1.0, rain: false, light: 'day' },
+    rainy:   { label: 'Rainy day',   spawnPerMin: 14, interestMul: 0.6, speedMul: 1.2, buyMul: 0.8, rain: true,  light: 'overcast' },
+    rush:    { label: 'Dinner rush', spawnPerMin: 110, interestMul: 1.3, speedMul: 0.95, buyMul: 0.3, rain: false, light: 'dusk' },
+    dead:    { label: 'Dead hours',  spawnPerMin: 6,  interestMul: 0.9, speedMul: 1.0, buyMul: 1.0, rain: false, light: 'night' },
+  } as Record<string, { label: string; spawnPerMin: number; interestMul: number; speedMul: number; buyMul: number; rain: boolean; light: LightPreset }>,
   campaign: {
     posterLift: 0.12,      // attractiveness bonus for a window poster
     bannerLift: 0.10,      // attractiveness bonus for a banner above the sign

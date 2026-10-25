@@ -71,7 +71,7 @@ function applyScenario(id: ScenarioId) {
   rig.applyLighting(sc.light);
   street.setNight(rig.nightFactor);
   rain.setEnabled(sc.rain);
-  if (crowd) { crowd.spawnPerMin = sc.spawnPerMin; crowd.interestMul = sc.interestMul; crowd.speedMul = sc.speedMul; crowd.setRaining(sc.rain); }
+  if (crowd) { crowd.spawnPerMin = sc.spawnPerMin; crowd.interestMul = sc.interestMul; crowd.speedMul = sc.speedMul; crowd.buyMul = sc.buyMul; crowd.setRaining(sc.rain); }
   console.info(`[sim] scenario: ${sc.label}`);
   return sc.spawnPerMin;
 }
@@ -81,7 +81,7 @@ function build() {
   const rng = new RNG(seed);
   crowd = new Crowd(rng, storefront, bus);
   const sc = CONFIG.scenarios[scenario];
-  crowd.spawnPerMin = spawnPerMin; crowd.interestMul = sc.interestMul; crowd.speedMul = sc.speedMul; crowd.setRaining(sc.rain);
+  crowd.spawnPerMin = spawnPerMin; crowd.interestMul = sc.interestMul; crowd.speedMul = sc.speedMul; crowd.buyMul = sc.buyMul; crowd.setRaining(sc.rain);
   crowd.setRaysVisible(debug.rays);
   detector = new GroundTruthDetector(cam, storefront, bus);
   crowd.onRemoved = (p) => detector.onPedestrianRemoved(simTime, p);

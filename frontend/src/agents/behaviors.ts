@@ -5,7 +5,7 @@ import { Storefront } from '../world/storefront';
 import { Pedestrian } from './pedestrian';
 import { AttentionEvent } from '../manager/eventBus';
 
-export interface BehaviorCtx { rng: RNG; storefront: Storefront; t: number; emit: (e: AttentionEvent) => void; }
+export interface BehaviorCtx { rng: RNG; storefront: Storefront; t: number; buyMul: number; emit: (e: AttentionEvent) => void; }
 
 /**
  * Sidewalk interest model + interior visit model.
@@ -71,7 +71,7 @@ export function updateBehavior(p: Pedestrian, dt: number, ctx: BehaviorCtx): THR
             p.stateTimer = 0;
             p.targets = [pt(ctx.rng.pick(sf.browsePoints))];
             p.dwell = ctx.rng.range(I.browseDur[0], I.browseDur[1]);
-          } else if (ctx.rng.chance(I.buyBase + 0.4 * p.interest + sf.conversionLift)) {
+          } else if (ctx.rng.chance((I.buyBase + 0.4 * p.interest) * ctx.buyMul + sf.conversionLift)) {
             p.state = 'inside_counter';
             p.targets = [pt(sf.counterPoint)];
             p.dwell = ctx.rng.range(I.counterDur[0], I.counterDur[1]);
