@@ -62,7 +62,7 @@ function flushFootfall() {
 }
 const meshBadge = document.getElementById('t-mesh')!;
 let meshProvider = '–';
-const renderMeshBadge = () => { meshBadge.textContent = `mesh ${mesh.connected ? 'on' : 'off'} · ${meshProvider}`; };
+const renderMeshBadge = () => { meshBadge.textContent = mesh.connected ? `agents on · ${meshProvider}` : 'agents offline — start the backend'; meshBadge.style.color = mesh.connected ? '#7ee2a8' : '#f88'; };
 mesh.onConnection = renderMeshBadge;
 mesh.on('mesh.status', (e) => { meshProvider = `${e.payload.provider} · ${e.payload.imageProvider}${e.payload.online ? '' : ' · offline'}`; renderMeshBadge(); });
 
@@ -107,7 +107,6 @@ function setView(v: ViewMode) {
 
 const panel = new Panel({
   onKnobs: (k) => { storefront.applyKnobs(k); return storefront.attractiveness; },
-  onCampaign: (c) => { storefront.applyCampaign(c); return storefront.attractiveness; },
   onScenario: (id) => applyScenario(id),
   onView: (v) => setView(v),
   onPause: () => (paused = !paused),
@@ -121,13 +120,15 @@ panel.setSpawn(spawnPerMin);
 build();
 setView('external');
 
+// Campaigns only ever arrive from the agents (after owner approval). Nothing here is editable by hand.
 mesh.on('display.set', (e) => {
   if (e.payload.expiresAt < Date.now()) return;
   const c = e.payload.campaign;
-  panel.setCampaign({ active: true, headline: c.headline, subline: c.subline, color: c.color, poster: true, banner: true, aFrame: true });
+  storefront.applyCampaign({ active: true, headline: c.headline, subline: c.subline, color: c.color, poster: true, banner: false, aFrame: true });
   storefront.setScreenImage(`${HTTP_BASE}${c.imageUrl ?? c.posterUrl}`);
+  panel.setLiveCampaign(`${c.kind.toUpperCase()} · ${c.headline} — ${c.subline} · code ${c.code} · ${c.items.join(', ')} · image via ${c.imageProvider}`, storefront.attractiveness);
 });
-mesh.on('display.clear', () => { panel.setCampaign({ ...panel.readCampaign(), active: false }); storefront.setScreenImage(null); });
+mesh.on('display.clear', () => { storefront.applyCampaign({ ...storefront.campaign, active: false }); storefront.setScreenImage(null); panel.setLiveCampaign(null, storefront.attractiveness); });
 mesh.on('sim.control', (e) => {
   if (e.payload.action === 'scenario') panel.selectScenario(e.payload.scenario as ScenarioId);
   else if (e.payload.action === 'reset') { build(); }

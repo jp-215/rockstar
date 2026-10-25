@@ -29,6 +29,9 @@ change it safely.
 ```
 
 Rules that define the hierarchy:
+- Nothing is authored by hand. Every campaign is proposed by the Manager from live signals, built by the
+  Campaign agent from **real menu items and prices** (chosen by the Manager: best sellers, warm items, or
+  the dishes that use expiring stock), and reaches the TV and customers only after the owner approves.
 - Sub-agents publish signals and results to the bus; the **Manager** decides what to do with them.
 - The Manager is the **only** agent that publishes `owner.message` and holds the Telegram adapter.
 - Every campaign goes to the owner for approval (`APPROVE` / `REJECT` on Telegram) before anything

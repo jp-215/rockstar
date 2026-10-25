@@ -3,7 +3,14 @@ import { randomUUID } from 'node:crypto';
 import type { Bus } from '../bus.ts';
 import type { LLMRouter } from '../llm/router.ts';
 import type { OwnerChannel } from '../adapters/owner.ts';
-import type { Campaign, CampaignBrief, CampaignKind, InventoryAlert, MetricsSnapshot } from '../../../shared/mesh-types.ts';
+import type { Campaign, CampaignBrief, CampaignKind, InventoryAlert, InventoryState, MenuItem, MetricsSnapshot } from '../../../shared/mesh-types.ts';
+import { MENU } from '../pos.ts';
+import { menuItemsUsing } from './inventory.ts';
+
+const menuItem = (name: string): MenuItem | null => { const m = MENU.find(([n]) => n === name); return m ? { name: m[0], price: m[1] } : null; };
+const WARM_ITEMS = ['soup', 'flat white', 'cortado'];
+import { RECIPES } from './inventory.ts';
+const RECIPE_OF = (name: string) => RECIPES[name];
 
 const COOLDOWN: Record<CampaignKind, number> = { flash: 600, winback: 900, bogo: 1200 };   // sim-seconds
 const MIN_PASSERSBY = 20;
@@ -24,10 +31,12 @@ export class ManagerAgent {
   private live: { campaign: Campaign; before: MetricsSnapshot; liveAt: number; redemptions: number; reported: boolean; reportedEmpty: boolean } | null = null;
   private bogoDone = new Set<string>();   // sku@day already campaigned
   private deciding = false;               // reserved while a brief is being written (model calls take seconds)
+  private stock: InventoryState | null = null;
 
   constructor(private bus: Bus, private llm: LLMRouter, private owner: OwnerChannel) {
     bus.on('analytics.report', (e) => { this.latest = e.payload; void this.onReport(e.payload, e.traceId); });
     bus.on('inventory.alert', (e) => void this.onInventory(e.payload, e.traceId));
+    bus.on('inventory.state', (e) => { this.stock = e.payload; });
     bus.on('campaign.draft', (e) => void this.requestApproval(e.payload.campaign, e.traceId));
     bus.on('owner.action', (e) => this.decide(e.payload.campaignId, e.payload.action, e.payload.by, e.traceId));
     bus.on('owner.reply', (e) => void this.onOwnerText(e.payload.text, e.payload.by, e.traceId));
@@ -49,8 +58,20 @@ export class ManagerAgent {
   /** Claim a trigger before any await so concurrent reports can't double-fire. */
   private reserve(kind: CampaignKind, now: number) { this.deciding = true; this.lastTrigger[kind] = now; }
 
-  private brief(kind: CampaignKind, trigger: string, items: string[], maxDiscountPct: number, durationMin: number, metrics: MetricsSnapshot | undefined, traceId: string) {
-    const b: CampaignBrief = { id: `cmp-${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`, kind, trigger, items, maxDiscountPct, durationMin, metrics };
+  /** Items a campaign must feature, always real menu items that are in stock. */
+  private pickItems(kind: CampaignKind, m: MetricsSnapshot | null, skus: string[] = []): { items: string[]; why: string } {
+    const inStock = (name: string) => { if (!this.stock) return true; const it = this.stock.items; return (RECIPE_OF(name) ?? []).every((r) => (it.find((i) => i.sku === r.sku)?.qty ?? 0) > 0); };
+    const uniq = (a: string[]) => [...new Set(a)].filter((n) => menuItem(n) && inStock(n));
+    if (kind === 'bogo') { const items = uniq(skus.flatMap(menuItemsUsing)).slice(0, 3); if (items.length) return { items, why: 'these use the stock that expires within 4 days' }; }
+    if (kind === 'winback') { const items = uniq(WARM_ITEMS).slice(0, 2); if (items.length) return { items, why: 'warm, low-cost items that pull people in from bad weather' }; }
+    const top = uniq((m?.topItems ?? []).map((t) => t.name)).slice(0, 2);
+    if (top.length) return { items: top, why: 'best sellers in the last five minutes' };
+    return { items: uniq(['flat white', 'pastry']).slice(0, 2), why: 'house staples' };
+  }
+
+  private brief(kind: CampaignKind, trigger: string, pick: { items: string[]; why: string }, maxDiscountPct: number, durationMin: number, metrics: MetricsSnapshot | undefined, traceId: string) {
+    const menu = pick.items.map(menuItem).filter((x): x is MenuItem => !!x);
+    const b: CampaignBrief = { id: `cmp-${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`, kind, trigger, items: pick.items, menu, why: pick.why, maxDiscountPct, durationMin, metrics };
     this.briefOut = b; this.deciding = false;
     this.bus.publish('manager', 'manager.decision', { kind: 'campaign', reason: trigger, briefId: b.id }, traceId);
     this.bus.publish('manager', 'campaign.brief', b, traceId);
@@ -68,8 +89,9 @@ export class ManagerAgent {
       const reason = conversionDown
         ? `Footfall up to ${m.footfallPerMin.toFixed(0)}/min (baseline ${m.baseline.footfallPerMin.toFixed(0)}) but conversion fell to ${pct(m.conversion)} from ${pct(m.baseline.conversion)}.`
         : `Footfall up to ${m.footfallPerMin.toFixed(0)}/min (baseline ${m.baseline.footfallPerMin.toFixed(0)}) while sales stayed flat at ${m.sales} in the last 5 min.`;
-      await this.briefOwner(reason, m, 'flash', traceId);
-      this.brief('flash', reason, [], 20, 30, m, traceId);
+      const pick = this.pickItems('flash', m);
+      await this.briefOwner(`${reason} Featuring ${pick.items.join(' and ')} (${pick.why}).`, m, 'flash', traceId);
+      this.brief('flash', reason, pick, 20, 30, m, traceId);
       return;
     }
     const badWeather = m.weather === 'rain' || m.weather === 'overcast';
@@ -77,8 +99,9 @@ export class ManagerAgent {
     if ((lightTraffic || (badWeather && m.footfallPerMin < m.baseline.footfallPerMin)) && this.canTrigger('winback', m.simTime)) {
       this.reserve('winback', m.simTime);
       const reason = `${badWeather ? `Weather is ${m.weather} and f` : 'F'}ootfall is light at ${m.footfallPerMin.toFixed(0)}/min (baseline ${m.baseline.footfallPerMin.toFixed(0)}); the room is quiet.`;
-      await this.briefOwner(reason, m, 'winback', traceId);
-      this.brief('winback', reason, [], 15, 60, m, traceId);
+      const pick = this.pickItems('winback', m);
+      await this.briefOwner(`${reason} Featuring ${pick.items.join(' and ')} (${pick.why}).`, m, 'winback', traceId);
+      this.brief('winback', reason, pick, 15, 60, m, traceId);
     }
   }
 
@@ -91,11 +114,13 @@ export class ManagerAgent {
     if (!items.length) return;
     const now = this.latest?.simTime ?? 0;
     if (!this.canTrigger('bogo', now)) { await this.tell(`Heads up: ${a.text} I will propose a sell-through campaign once the current one ends.`, 'alert', traceId); return; }
+    const pick = this.pickItems('bogo', this.latest, items.map((i) => i.sku));
+    if (!pick.items.length) { await this.tell(`Heads up: ${a.text} No menu item uses that stock, so no campaign; consider a staff special.`, 'alert', traceId); return; }
     this.reserve('bogo', now);
     for (const i of items) this.bogoDone.add(`${i.sku}@${i.daysLeft}`);
-    const reason = `${a.text} A buy-one-get-one moves it at margin instead of writing it off.`;
+    const reason = `${a.text} A buy-one-get-one on ${pick.items.join(', ')} moves it at margin instead of writing it off.`;
     await this.tell(`${reason} Asking the campaign agent for a draft; you will get it here for approval.`, 'brief', traceId);
-    this.brief('bogo', reason, items.map((i) => i.name), 50, 120, this.latest ?? undefined, traceId);
+    this.brief('bogo', reason, pick, 50, 120, this.latest ?? undefined, traceId);
   }
 
   private async briefOwner(reason: string, m: MetricsSnapshot, kind: CampaignKind, traceId: string) {

@@ -15,11 +15,15 @@ export type CampaignKind = 'flash' | 'winback' | 'bogo';
 export type CampaignColor = 'red' | 'teal' | 'gold' | 'black';
 
 /** What the manager asks the campaign agent for. */
+export interface MenuItem { name: string; price: number }
+
 export interface CampaignBrief {
   id: string;
   kind: CampaignKind;
   trigger: string;             // human-readable reason
-  items: string[];             // inventory items to push (bogo / winback), empty for flash
+  items: string[];             // menu item names the campaign must feature (never empty)
+  menu: MenuItem[];            // those items with prices, so copy and poster are grounded
+  why: string;                 // why these items (top sellers / expiring stock / warm on a cold day)
   maxDiscountPct: number;
   durationMin: number;
   metrics?: MetricsSnapshot;
@@ -57,6 +61,7 @@ export interface MetricsSnapshot {
   baseline: { footfallPerMin: number; sales: number; conversion: number };
   baselineSec: number;         // history the baseline covers (0 = none yet)
   trend: 'up' | 'flat' | 'down';
+  topItems: { name: string; count: number }[];   // best-selling menu items in the window
 }
 
 export interface InventoryItem {

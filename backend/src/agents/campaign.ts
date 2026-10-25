@@ -30,12 +30,15 @@ export class CampaignAgent {
   }
 
   private templateFor(b: CampaignBrief) {
-    const items = b.items.slice(0, 2).join(', ') + (b.items.length > 2 ? ' & more' : '');
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    const names = b.menu.map((m) => cap(m.name));
+    const list = names.slice(0, 2).join(' & ') + (names.length > 2 ? ' & more' : '');
+    const priced = b.menu.slice(0, 2).map((m) => `${cap(m.name)} $${m.price.toFixed(2)}`).join(' · ');
     const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s);
     switch (b.kind) {
-      case 'bogo': return { headline: 'Buy one, get one free', subline: clip(`${items || 'Fresh today'} — today only`, 60), offer: 'BOGO', discountPct: 50, customerText: `Today only at the café on Market St: buy one, get one free on ${items || 'fresh items'}. Show this message at the counter.`, color: 'gold' as const, rationale: `${items || 'Fresh stock'} expires soon; a BOGO sells it at margin instead of writing it off.`, imagePrompt: `Appetising close-up of ${items || 'fresh bakery items'} on a rustic café counter, warm morning light, shallow depth of field, no text` };
-      case 'winback': return { headline: 'Rainy day warm-up', subline: 'Free coffee with any plate', offer: 'Free coffee with any plate', discountPct: 15, customerText: `Grey day on Market St? Come dry off: free coffee with any plate at the café for the next hour. Show this message at the counter.`, color: 'teal' as const, rationale: 'Traffic is light and the weather is keeping people away; a warm, low-cost offer brings them in.', imagePrompt: 'Cosy café window on a rainy San Francisco street, steaming coffee cup in the foreground, soft warm interior light, no text' };
-      default: return { headline: '20% OFF next 30 min', subline: 'Show this message at the counter', offer: '20% off', discountPct: 20, customerText: 'Flash deal at the café on Market St: 20% off everything for the next 30 minutes. Show this message at the counter.', color: 'red' as const, rationale: 'Traffic is up but people are walking past; a short, visible discount converts browsers now.', imagePrompt: 'Lively San Francisco café storefront at golden hour with people walking by, inviting glow from the window, no text' };
+      case 'bogo': return { headline: clip(`2-for-1 ${list}`, 40), subline: clip(`Buy one, get one free — today only`, 60), offer: 'BOGO', discountPct: 50, customerText: clip(`Today only at the café on Market St: buy one, get one free on ${list.toLowerCase()} (${priced}). Show this message at the counter.`, 220), color: 'gold' as const, rationale: `${list} use stock that expires within days; a BOGO sells it at margin instead of writing it off.`, imagePrompt: `Appetising close-up of ${names.join(' and ').toLowerCase()} on a rustic café counter, warm morning light, shallow depth of field, no text` };
+      case 'winback': return { headline: clip(`Warm up: ${names[0] ?? 'soup'} + coffee`, 40), subline: clip(`${priced} — 15% off while it pours`, 60), offer: '15% off', discountPct: 15, customerText: clip(`Grey day on Market St? Come dry off: ${list.toLowerCase()} 15% off for the next hour (${priced}). Show this message at the counter.`, 220), color: 'teal' as const, rationale: 'Traffic is light and the weather is keeping people away; warm, low-cost items bring them in.', imagePrompt: `Steaming ${names[0]?.toLowerCase() ?? 'soup'} and a coffee on a café table by a rain-streaked window, soft warm light, no text` };
+      default: return { headline: clip(`20% off ${list}`, 40), subline: clip(`${priced} — next 30 min`, 60), offer: '20% off', discountPct: 20, customerText: clip(`Flash deal at the café on Market St: 20% off ${list.toLowerCase()} for the next 30 minutes (${priced}). Show this message at the counter.`, 220), color: 'red' as const, rationale: `Traffic is up but people are walking past; a short, visible deal on ${list.toLowerCase()} converts browsers now.`, imagePrompt: `Appetising ${names.join(' and ').toLowerCase()} on a café counter with a lively Market Street window behind, golden hour, no text` };
     }
   }
 
@@ -43,8 +46,8 @@ export class CampaignAgent {
     const template = () => this.templateFor(b);
     const { value, provider } = await this.llm.complete({
       agent: 'campaign', task: `draft_${b.kind}`, schema: Draft, example: template(), template, maxTokens: 500,
-      system: `You are the campaign agent for a small café on Market Street, San Francisco. Draft ONE campaign of kind "${b.kind}". Rules: discount at most ${b.maxDiscountPct}% (a buy-one-get-one is 50), headline under 40 characters (TV and storefront banner), subline under 60, customerText under 220 characters, friendly, no emoji, no links. ${b.items.length ? `Feature these items: ${b.items.join(', ')}.` : ''} imagePrompt describes a photo for the poster with no text in it. Pick a color from red, teal, gold, black.`,
-      user: JSON.stringify({ trigger: b.trigger, items: b.items, metrics: b.metrics }),
+      system: `You are the campaign agent for a small café on Market Street, San Francisco. Draft ONE campaign of kind "${b.kind}" built around REAL menu items from the brief (use their exact names and prices; never invent items). Rules: discount at most ${b.maxDiscountPct}% (a buy-one-get-one is 50), headline under 40 characters and naming at least one of the items (it goes on the storefront TV), subline under 60 with a price, customerText under 220 characters, friendly, no emoji, no links. imagePrompt describes an appetising photo of those items for a portrait poster, with no text in the image. Pick a color from red, teal, gold, black.`,
+      user: JSON.stringify({ trigger: b.trigger, why: b.why, menu: b.menu, metrics: b.metrics }),
     });
     const discountPct = Math.min(b.maxDiscountPct, Math.max(5, Math.round(value.discountPct)));
     const code = b.kind === 'bogo' ? 'BOGO' : b.kind === 'winback' ? `WARM${discountPct}` : `FLASH${discountPct}`;

@@ -76,7 +76,7 @@
         <button id="c-reset">Reset</button>
       </div>
       <div class="spacer"></div>
-      <div id="ticker"><b id="t-look">0%</b> look rate · <b id="t-inside">0</b> inside · <b id="t-clock">0:00</b> · <span id="t-mesh">mesh off</span></div>
+      <div id="ticker"><b id="t-look">0%</b> look rate · <b id="t-inside">0</b> inside · <b id="t-clock">0:00</b> · <span id="t-mesh" style="color:#f88">agents offline</span></div>
       <div class="seg"><button id="c-panel" class="on">Panel</button></div>
     </div>
 
@@ -98,17 +98,10 @@
       <h2>Alerts</h2>
       <div id="alerts"></div>
 
-      <h2>Campaign</h2>
-      <div class="camp" id="camp">
-        <div class="row"><label><b>Campaign live</b></label><input type="checkbox" id="m-active"></div>
-        <div class="row"><label>Headline</label><input type="text" id="m-head" value="Happy Hour 4–6" maxlength="28"></div>
-        <div class="row"><label>Subline</label><input type="text" id="m-sub" value="Half-price small plates" maxlength="40"></div>
-        <div class="row"><label>Colour</label><select id="m-color"><option value="red">Red</option><option value="teal">Teal</option><option value="gold">Gold</option><option value="black">Black</option></select></div>
-        <div class="row"><label>Print on A-frame</label><input type="checkbox" id="m-aframe" checked></div>
-        <div class="hint">The campaign shows on the window TV (and the A-frame if ticked). The board above the window always carries the restaurant name. Live campaigns raise attractiveness and the odds a visitor buys.</div>
-      </div>
+      <h2>Live campaign (from the agents)</h2>
+      <div class="camp" id="camp"><div id="live-campaign" style="color:var(--muted)">None. Campaigns are proposed by the manager agent from traffic, weather and inventory, drafted by the campaign agent from real menu items, and go live only after the owner approves on Telegram.</div></div>
 
-      <h2>Storefront</h2>
+      <h2>Store setup (physical)</h2>
       <div class="row"><label>Sign brightness</label><input type="range" id="k-sign" min="0" max="1" step="0.05" value="0.4"><span class="val" id="k-sign-v"></span></div>
       <div class="row"><label>Awning</label><input type="checkbox" id="k-awning"></div>
       <div class="row"><label>Window display</label><input type="checkbox" id="k-window"></div>

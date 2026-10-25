@@ -39,7 +39,7 @@ export class Storefront {
   readonly browsePoints: THREE.Vector3[];
   readonly zone: { xMin: number; xMax: number; zMin: number; zMax: number };
   knobs: StorefrontKnobs = { signBrightness: 0.4, awning: false, windowDisplay: false, aFrame: false };
-  campaign: Campaign = { active: false, headline: 'Happy Hour 4–6', subline: 'Half-price small plates', color: 'red', poster: true, banner: true, aFrame: true };
+  campaign: Campaign = { active: false, headline: '', subline: '', color: 'red', poster: true, banner: false, aFrame: true };   // set only by the agents via display.set
 
   private signMat: THREE.MeshStandardMaterial;
   private signLight: THREE.PointLight;

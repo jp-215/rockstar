@@ -1,6 +1,6 @@
 import { Alert } from './alerts';
 import { Stats } from './metrics';
-import { Campaign, CampaignColor, StorefrontKnobs } from '../world/storefront';
+import { StorefrontKnobs } from '../world/storefront';
 import { ScenarioId } from '../config';
 
 export type ViewMode = 'external' | 'camera';
@@ -8,7 +8,6 @@ export interface DebugFlags { rays: boolean; frustum: boolean; zone: boolean; pi
 
 export interface PanelCallbacks {
   onKnobs(k: StorefrontKnobs): number;      // returns resulting attractiveness
-  onCampaign(c: Campaign): number;          // returns resulting attractiveness
   onScenario(id: ScenarioId): number;       // returns the scenario's spawn rate (to sync the slider)
   onView(v: ViewMode): void;
   onPause(): boolean;                       // returns new paused state
@@ -48,9 +47,6 @@ export class Panel {
     for (const id of ['k-sign', 'k-awning', 'k-window', 'k-aframe']) $(id).addEventListener('input', knobs);
     knobs();
 
-    const camp = () => { const c = this.readCampaign(); $('camp').classList.toggle('live', c.active); this.setAttractiveness(cb.onCampaign(c)); };
-    for (const id of ['m-active', 'm-head', 'm-sub', 'm-color', 'm-aframe']) $(id).addEventListener('input', camp);
-    camp();
 
     $('c-pause').addEventListener('click', () => { $('c-pause').textContent = cb.onPause() ? 'Resume' : 'Pause'; });
     $('c-reset').addEventListener('click', () => { cb.onReset(Number(inp('c-seed').value) || 1); this.alertsEl.innerHTML = ''; });
@@ -71,19 +67,13 @@ export class Panel {
     return { signBrightness: sign, awning: inp('k-awning').checked, windowDisplay: inp('k-window').checked, aFrame: inp('k-aframe').checked };
   }
 
-  readCampaign(): Campaign {
-    return {
-      active: inp('m-active').checked, headline: inp('m-head').value, subline: inp('m-sub').value,
-      color: $<HTMLSelectElement>('m-color').value as CampaignColor,
-      poster: true, banner: false, aFrame: inp('m-aframe').checked,
-    };
-  }
-
-  /** Programmatic campaign update (from the mesh); fires the same handlers as typing. */
-  setCampaign(c: Campaign) {
-    inp('m-active').checked = c.active; inp('m-head').value = c.headline; inp('m-sub').value = c.subline;
-    $<HTMLSelectElement>('m-color').value = c.color; inp('m-aframe').checked = c.aFrame;
-    $('m-active').dispatchEvent(new Event('input'));
+  /** Read-only view of the agent-driven campaign currently on the storefront. */
+  setLiveCampaign(text: string | null, attractiveness: number) {
+    const el = $('live-campaign');
+    $('camp').classList.toggle('live', !!text);
+    el.style.color = text ? '' : 'var(--muted)';
+    el.textContent = text ?? 'None. Campaigns are proposed by the manager agent from traffic, weather and inventory, drafted by the campaign agent from real menu items, and go live only after the owner approves on Telegram.';
+    this.setAttractiveness(attractiveness);
   }
   selectScenario(id: ScenarioId) { $('scenarios').querySelector<HTMLButtonElement>(`button[data-scenario="${id}"]`)?.click(); }
 

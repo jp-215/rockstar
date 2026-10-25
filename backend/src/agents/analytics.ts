@@ -67,6 +67,9 @@ export class AnalyticsAgent {
     const passersby = sum(fw, (s) => s.passersby), lookers = sum(fw, (s) => s.lookers), walkIns = sum(fw, (s) => s.walkIns);
     const footfallPerMin = passersby / (winSec / 60);
     const conversion = walkIns ? sw.length / walkIns : 0;
+    const counts = new Map<string, number>();
+    for (const sale of sw) for (const it of sale.items) counts.set(it, (counts.get(it) ?? 0) + 1);
+    const topItems = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, count]) => ({ name, count }));
     let baseline = { footfallPerMin, sales: sw.length, conversion };
     let trend: MetricsSnapshot['trend'] = 'flat';
     if (baseSec >= 60) {
@@ -76,7 +79,7 @@ export class AnalyticsAgent {
       if (baseline.footfallPerMin > 0) { const r = footfallPerMin / baseline.footfallPerMin; trend = r >= 1.3 ? 'up' : r <= 0.7 ? 'down' : 'flat'; }
       else if (footfallPerMin > 5) trend = 'up';
     }
-    return { simTime: now, weather: this.weather, footfallPerMin, lookRate: passersby ? lookers / passersby : 0, walkIns, sales: sw.length, revenue: sum(sw, (s) => s.amount), conversion, baseline, baselineSec: baseSec >= 60 ? baseSec : 0, trend };
+    return { simTime: now, weather: this.weather, footfallPerMin, lookRate: passersby ? lookers / passersby : 0, walkIns, sales: sw.length, revenue: sum(sw, (s) => s.amount), conversion, baseline, baselineSec: baseSec >= 60 ? baseSec : 0, trend, topItems };
   }
 
   private async report(now: number) {

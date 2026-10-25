@@ -19,7 +19,7 @@ const SEED: InventoryItem[] = [
 ];
 
 /** Which inventory a menu item consumes. */
-const RECIPES: Record<string, { sku: string; qty: number }[]> = {
+export const RECIPES: Record<string, { sku: string; qty: number }[]> = {
   'flat white': [{ sku: 'beans', qty: 0.02 }, { sku: 'milk', qty: 0.2 }],
   'cortado': [{ sku: 'beans', qty: 0.02 }, { sku: 'milk', qty: 0.1 }],
   'avocado toast': [{ sku: 'avocado', qty: 1 }, { sku: 'bread', qty: 0.25 }],
@@ -29,6 +29,11 @@ const RECIPES: Record<string, { sku: string; qty: number }[]> = {
   'soup': [{ sku: 'soup', qty: 1 }, { sku: 'bread', qty: 0.1 }],
   'salmon plate': [{ sku: 'salmon', qty: 1 }, { sku: 'bread', qty: 0.2 }],
 };
+
+/** Menu items that use a given ingredient (for sell-through campaigns). */
+export function menuItemsUsing(sku: string): string[] {
+  return Object.entries(RECIPES).filter(([, parts]) => parts.some((r) => r.sku === sku && r.qty >= 0.2)).map(([name]) => name);
+}
 
 /**
  * Inventory sub-agent: stock levels, expiry dates on a store-day clock, consumption from POS sales.
