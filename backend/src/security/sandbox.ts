@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 /**
  * Customer text is data, never instructions. The LLM may only classify it into a closed set of

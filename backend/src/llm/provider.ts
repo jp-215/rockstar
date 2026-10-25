@@ -1,4 +1,4 @@
-import type { ZodType } from 'zod';
+import type { ZodType } from 'zod/v4';
 import type { AgentName, Provider } from '../../../shared/mesh-types.ts';
 
 /** One structured LLM call. Every request carries a deterministic template so the mesh never stalls. */

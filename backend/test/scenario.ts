@@ -6,12 +6,15 @@
  * plus an injection attempt, a JOIN opt-in, and the daily report on request.
  * Run: npm test   (MESH_PROVIDER=template is the default when no model is configured)
  */
-process.env.MESH_PROVIDER ??= 'template';
+import { loadEnv } from '../src/env.ts';
+loadEnv();
+process.env.MESH_PROVIDER ??= process.env.ANTHROPIC_API_KEY ? 'claude' : 'template';
 process.env.COMMS_APPLESCRIPT = '0';
+if (process.env.KEEP_ASSETS !== '1') process.env.FLUX_API_KEY = '';   // hosted images only when explicitly requested
 import { startMesh } from '../src/index.ts';
 import type { Envelope, Topic, Weather } from '../../shared/mesh-types.ts';
 
-const mesh = await startMesh({ port: null, log: false, demoMinutes: 0.1 });
+const mesh = await startMesh({ port: null, log: process.env.KEEP_ASSETS === '1', demoMinutes: 0.1 });
 const { bus } = mesh;
 const seen: Envelope[] = [];
 const QUIET = new Set<Topic>(['sim.footfall', 'llm.call', 'inventory.state', 'analytics.report', 'pos.sale', 'sim.purchased', 'comms.notify', 'customers.updated']);
@@ -36,6 +39,7 @@ async function feed(seconds: number, per: { passersby: number; lookers: number; 
   }
 }
 const LLM_WAIT = process.env.MESH_PROVIDER === 'template' ? 20000 : 240000;
+console.log(`provider: ${process.env.MESH_PROVIDER}, hosted images: ${process.env.FLUX_API_KEY ? 'on' : 'off'}`);
 const expect = async <T extends Topic>(topic: T, pred: (e: Envelope<T>) => boolean = () => true, ms = LLM_WAIT) => (seen.find((e) => e.topic === topic && pred(e as Envelope<T>)) as Envelope<T> | undefined) ?? bus.waitFor(topic, pred, ms);
 const assert = (cond: unknown, msg: string) => { if (!cond) { console.error(`\nFAIL: ${msg}`); process.exit(1); } console.log(`  ✓ ${msg}`); };
 const seenAfter = (i: number) => seen.slice(i);
@@ -60,7 +64,8 @@ const live1 = await approve(d1.payload.campaign.id);
 assert(live1.payload.campaign.id === d1.payload.campaign.id, 'owner replied "approve" → campaign live');
 await expect('display.set', (e) => e.payload.campaign.id === live1.payload.campaign.id); assert(true, 'TV display set');
 const sent1 = await expect('comms.sent');
-assert(sent1.payload.count === 3, `communication agent messaged ${sent1.payload.count} opted-in customers (dry-run iMessage)`);
+const optedIn = mesh.customers.optedIn().length;
+assert(sent1.payload.count === optedIn && optedIn >= 3, `communication agent messaged all ${sent1.payload.count} opted-in customers (dry-run iMessage)`);
 await feed(90, { passersby: 12, lookers: 5, walkIns: 3 }, 15);
 await expect('pos.sale', (e) => e.payload.promoCode === live1.payload.campaign.code);
 const lift1 = await expect('manager.lift_report', (e) => e.payload.redemptions >= 1);

@@ -9,7 +9,7 @@
  *        (no models given → a default candidate list)
  */
 process.env.OLLAMA_TIMEOUT_MS ??= '150000';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { OllamaProvider, OLLAMA_URL } from '../src/llm/ollama.ts';

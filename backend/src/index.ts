@@ -1,3 +1,5 @@
+import { loadEnv } from './env.ts';
+const loadedEnv = loadEnv();
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { Bus } from './bus.ts';
@@ -28,6 +30,7 @@ export async function startMesh(opts: MeshOptions = {}) {
   const port = opts.port === null ? undefined : (opts.port ?? WS_PORT);
   const persist = opts.log !== false;
   const bus = new Bus({ port, logPath: persist ? resolve(dataDir, 'log.jsonl') : null, assetsDir: persist ? resolve(dataDir, 'assets') : null });
+  if (loadedEnv.length) console.info(`[env] loaded ${loadedEnv.join(', ')} from .env files`);
   const router = new LLMRouter(bus);
   const images = new ImageRouter(bus, bus.assetsDir);
   const publicBase = process.env.MESH_PUBLIC_BASE ?? `http://localhost:${port ?? WS_PORT}`;
@@ -50,7 +53,7 @@ export async function startMesh(opts: MeshOptions = {}) {
   };
   router.onStatus = () => void publishStatus();
   bus.on('mesh.control', (e) => {
-    if (e.payload.action === 'force_offline') router.setForcedOffline(e.payload.value);
+    if (e.payload.action === 'force_offline') { router.setForcedOffline(e.payload.value); images.forcedOffline = e.payload.value; void publishStatus(); }
     if (e.payload.action === 'status') { void publishStatus(); customers.save(); }
   });
 

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import type { Bus } from '../bus.ts';
 import type { LLMRouter } from '../llm/router.ts';
 import type { CampaignKind, DailyReport, MetricsSnapshot, Weather } from '../../../shared/mesh-types.ts';
@@ -111,7 +111,7 @@ export class AnalyticsAgent {
     const schema = z.object({ narrative: z.string().max(600) });
     const template = () => ({ narrative: `Day ${base.day} (${why}): ${footfall} passersby, ${(base.lookRate * 100).toFixed(0)}% looked, ${walkIns} walk-ins, ${base.sales} sales for $${base.revenue.toFixed(2)} (conversion ${(base.conversion * 100).toFixed(0)}%). ${campaigns.length} campaign${campaigns.length === 1 ? '' : 's'} (${campaigns.map((c) => `${c.headline}: ${c.redemptions} redemptions`).join('; ') || 'none'}). Waste $${base.wasteValue.toFixed(2)}, sales on expiring stock $${wasteAvoidedValue.toFixed(2)}.` });
     const { value, provider } = await this.llm.complete({
-      agent: 'analytics', task: 'daily', schema, example: { narrative: 'A slow, rainy day: 210 passersby, 14 walk-ins, 9 sales for $112. The rainy-day special brought 4 of those sales. No stock was wasted.' }, template, maxTokens: 300,
+      agent: 'analytics', task: 'daily', schema, example: { narrative: 'A slow, rainy day: 210 passersby, 14 walk-ins, 9 sales for $112. The rainy-day special brought 4 of those sales. No stock was wasted.' }, template, maxTokens: 900,
       system: 'You are the analytics agent for a small café. Write the end-of-day report for the owner in three short sentences with concrete numbers: traffic and conversion, campaigns and their effect, inventory waste. Plain language, no emoji.',
       user: JSON.stringify(base),
     });

@@ -68,7 +68,8 @@ rockstar/
   backend/              Node 20+ (tsx), one process
     src/index.ts        boots bus, routers, adapters, POS, customers, agents  (startMesh())
     src/bus.ts          typed pub/sub + WebSocket mirror (/ws) + asset server (/assets) on :8787 + JSONL log
-    src/llm/            text providers (Claude, Ollama opt-in, template) + router; image router (Ollama FLUX endpoint, SVG poster)
+    src/llm/            text providers (Claude, Ollama opt-in, template) + router; image router (BFL FLUX API, Ollama image endpoint, SVG poster)
+    src/env.ts          loads .env files (root, backend/, frontend/) without overriding the shell
     src/agents/         manager, communication, inventory, analytics, campaign
     src/adapters/       owner.ts (Telegram mock | grammY), applescript.ts (notifications, iMessage dry-run)
     src/security/       inbound-message sandbox
@@ -76,6 +77,7 @@ rockstar/
     src/customers.ts    opt-in registry (backend/data/customers.json)
     test/scenario.ts    headless end-to-end run of all three campaign paths (npm test)
     test/bench-models.ts benchmark local Ollama models on the real agent workloads
+    test/smoke-apis.ts  tiny calls to verify ANTHROPIC_API_KEY and FLUX_API_KEY
     data/               runtime: log.jsonl, customers.json, assets/<campaignId>/  (gitignored)
 ```
 
@@ -89,10 +91,25 @@ npm run typecheck      # both packages
 npm run build          # frontend production bundle in frontend/dist
 ```
 
-Open three tabs: Sim `/` (Street and Storefront-cam views), TV `/tv.html` (portrait monitor mirror), Console `/comms.html`. Optional `.env` (see `.env.example`):
-`ANTHROPIC_API_KEY` enables Claude for prose; `TELEGRAM_BOT_TOKEN` + `OWNER_TELEGRAM_CHAT_ID` make the
-owner channel real; `OLLAMA_ENABLED=1` / `OLLAMA_IMAGE_ENABLED=1` switch on local models. On macOS the
-communication agent posts real system notifications; `COMMS_IMESSAGE=1` sends real iMessages.
+Open three tabs: Sim `/` (Street and Storefront-cam views), TV `/tv.html` (portrait monitor mirror), Console `/comms.html`.
+
+### Keys and models
+
+Put keys in a `.env` at the repo root (the backend also reads `frontend/.env`; nothing without a `VITE_`
+prefix ever reaches the browser). See `.env.example` for every variable.
+
+| Variable | Effect | Fallback when missing |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Claude `claude-opus-5-5` writes briefs, campaign copy, narratives, classifies customer text | Ollama if `OLLAMA_ENABLED=1`, else templates |
+| `FLUX_API_KEY` | Black Forest Labs FLUX (`FLUX_MODEL`, default `flux-dev`) generates the 1080×1920 campaign image | Ollama image model if `OLLAMA_IMAGE_ENABLED=1`, else the SVG poster |
+| `TELEGRAM_BOT_TOKEN` + `OWNER_TELEGRAM_CHAT_ID` | real owner channel | console mock phone |
+| `COMMS_APPLESCRIPT` / `COMMS_IMESSAGE` | macOS notifications (on by default on macOS) / real iMessages (off) | mock / dry-run |
+
+`npx tsx backend/test/smoke-apis.ts` checks the keys with tiny calls. `npm test` uses Claude when a key
+is present and never calls the image API unless `KEEP_ASSETS=1` (it then also keeps `backend/data/assets`).
+On the Kubernetes environment the same code runs on local models: `OLLAMA_ENABLED=1 OLLAMA_MODEL=qwen3:4b`
+and `OLLAMA_IMAGE_ENABLED=1 OLLAMA_IMAGE_MODEL=flux2-klein:4b`. **Simulate offline** in the console
+disables both hosted APIs at once.
 
 ### Demo script
 
@@ -187,7 +204,7 @@ the code and, for item campaigns, skew to the promoted items; `ring_up` makes a 
 | Role | Online | Local (cluster) | Offline floor |
 |---|---|---|---|
 | Manager, Communication, Inventory, Analytics, Campaign copy | Claude `claude-opus-5-5`, structured output | Ollama `qwen3:4b` (or `qwen3:1.7b`, `llama3.2:3b`) via `OLLAMA_ENABLED=1` | templates |
-| Campaign image | hosted text-to-image (not wired yet) | Ollama experimental image endpoint, `flux2-klein:4b`, via `OLLAMA_IMAGE_ENABLED=1` | SVG poster |
+| Campaign image | BFL FLUX API (`FLUX_API_KEY`, `flux-dev`), 832×1440 upscaled to 1080×1920 | Ollama experimental image endpoint, `flux2-klein:4b`, via `OLLAMA_IMAGE_ENABLED=1` | SVG poster |
 
 `backend/test/bench-models.ts` runs the real workloads (classify, promo draft, narrative) against any
 installed Ollama model and prints latency and schema validity. On an 8 GB laptop stay at 1B to 4B.

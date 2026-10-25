@@ -5,7 +5,7 @@
 // the Manager decides.
 
 export type Provider = 'claude' | 'ollama' | 'template';
-export type ImageProviderName = 'ollama-image' | 'svg-template';
+export type ImageProviderName = 'bfl-flux' | 'ollama-image' | 'svg-template';
 export type AgentName =
   | 'sim' | 'pos' | 'manager' | 'communication' | 'inventory' | 'analytics' | 'campaign'
   | 'owner' | 'router' | 'console' | 'tv' | 'test';

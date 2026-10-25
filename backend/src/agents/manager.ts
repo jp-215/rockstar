@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { randomUUID } from 'node:crypto';
 import type { Bus } from '../bus.ts';
 import type { LLMRouter } from '../llm/router.ts';
@@ -23,6 +23,7 @@ export class ManagerAgent {
   private briefOut: CampaignBrief | null = null;
   private live: { campaign: Campaign; before: MetricsSnapshot; liveAt: number; redemptions: number; reported: boolean; reportedEmpty: boolean } | null = null;
   private bogoDone = new Set<string>();   // sku@day already campaigned
+  private deciding = false;               // reserved while a brief is being written (model calls take seconds)
 
   constructor(private bus: Bus, private llm: LLMRouter, private owner: OwnerChannel) {
     bus.on('analytics.report', (e) => { this.latest = e.payload; void this.onReport(e.payload, e.traceId); });
@@ -44,12 +45,13 @@ export class ManagerAgent {
     await this.owner.send(text, imageUrl);
   }
 
-  private canTrigger(kind: CampaignKind, now: number) { return !this.live && !this.pending && !this.briefOut && now - this.lastTrigger[kind] >= COOLDOWN[kind]; }
+  private canTrigger(kind: CampaignKind, now: number) { return !this.deciding && !this.live && !this.pending && !this.briefOut && now - this.lastTrigger[kind] >= COOLDOWN[kind]; }
+  /** Claim a trigger before any await so concurrent reports can't double-fire. */
+  private reserve(kind: CampaignKind, now: number) { this.deciding = true; this.lastTrigger[kind] = now; }
 
   private brief(kind: CampaignKind, trigger: string, items: string[], maxDiscountPct: number, durationMin: number, metrics: MetricsSnapshot | undefined, traceId: string) {
     const b: CampaignBrief = { id: `cmp-${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`, kind, trigger, items, maxDiscountPct, durationMin, metrics };
-    this.briefOut = b;
-    if (metrics) this.lastTrigger[kind] = metrics.simTime; else if (this.latest) this.lastTrigger[kind] = this.latest.simTime; else this.lastTrigger[kind] = 0;
+    this.briefOut = b; this.deciding = false;
     this.bus.publish('manager', 'manager.decision', { kind: 'campaign', reason: trigger, briefId: b.id }, traceId);
     this.bus.publish('manager', 'campaign.brief', b, traceId);
   }
@@ -62,6 +64,7 @@ export class ManagerAgent {
     const salesFlat = m.sales <= Math.max(m.baseline.sales, 0) + 0.5;
     const conversionDown = m.baseline.conversion > 0 && m.conversion < 0.8 * m.baseline.conversion;
     if (m.trend === 'up' && passersby >= MIN_PASSERSBY && (salesFlat || conversionDown) && this.canTrigger('flash', m.simTime)) {
+      this.reserve('flash', m.simTime);
       const reason = conversionDown
         ? `Footfall up to ${m.footfallPerMin.toFixed(0)}/min (baseline ${m.baseline.footfallPerMin.toFixed(0)}) but conversion fell to ${pct(m.conversion)} from ${pct(m.baseline.conversion)}.`
         : `Footfall up to ${m.footfallPerMin.toFixed(0)}/min (baseline ${m.baseline.footfallPerMin.toFixed(0)}) while sales stayed flat at ${m.sales} in the last 5 min.`;
@@ -72,6 +75,7 @@ export class ManagerAgent {
     const badWeather = m.weather === 'rain' || m.weather === 'overcast';
     const lightTraffic = m.trend === 'down' || m.footfallPerMin < LOW_TRAFFIC_PER_MIN;
     if ((lightTraffic || (badWeather && m.footfallPerMin < m.baseline.footfallPerMin)) && this.canTrigger('winback', m.simTime)) {
+      this.reserve('winback', m.simTime);
       const reason = `${badWeather ? `Weather is ${m.weather} and f` : 'F'}ootfall is light at ${m.footfallPerMin.toFixed(0)}/min (baseline ${m.baseline.footfallPerMin.toFixed(0)}); the room is quiet.`;
       await this.briefOwner(reason, m, 'winback', traceId);
       this.brief('winback', reason, [], 15, 60, m, traceId);
@@ -87,6 +91,7 @@ export class ManagerAgent {
     if (!items.length) return;
     const now = this.latest?.simTime ?? 0;
     if (!this.canTrigger('bogo', now)) { await this.tell(`Heads up: ${a.text} I will propose a sell-through campaign once the current one ends.`, 'alert', traceId); return; }
+    this.reserve('bogo', now);
     for (const i of items) this.bogoDone.add(`${i.sku}@${i.daysLeft}`);
     const reason = `${a.text} A buy-one-get-one moves it at margin instead of writing it off.`;
     await this.tell(`${reason} Asking the campaign agent for a draft; you will get it here for approval.`, 'brief', traceId);

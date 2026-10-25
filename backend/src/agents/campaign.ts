@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import type { Bus } from '../bus.ts';
 import type { LLMRouter } from '../llm/router.ts';
 import type { ImageRouter } from '../llm/image.ts';

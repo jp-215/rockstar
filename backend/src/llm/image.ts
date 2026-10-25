@@ -57,15 +57,52 @@ export async function toPortraitJpeg(input: Buffer): Promise<Buffer> {
   return sharp(input).resize(POSTER_W, POSTER_H, { fit: 'cover', position: 'centre' }).jpeg({ quality: 88 }).toBuffer();
 }
 
+/**
+ * Hosted FLUX via the Black Forest Labs API (FLUX_API_KEY). Submit → poll → download.
+ * BFL caps dimensions at 1440 and needs multiples of 32, so we render 832×1440 (9:16) and upscale.
+ */
+class BflFluxProvider {
+  private key = process.env.FLUX_API_KEY ?? '';
+  private base = process.env.FLUX_API_BASE ?? 'https://api.bfl.ai';
+  private model = process.env.FLUX_MODEL ?? 'flux-dev';
+  get enabled() { return this.key.length > 0; }
+
+  async generate(prompt: string, signal: AbortSignal): Promise<Buffer> {
+    const headers = { 'x-key': this.key, 'content-type': 'application/json', accept: 'application/json' };
+    const submit = await fetch(`${this.base}/v1/${this.model}`, { method: 'POST', headers, signal, body: JSON.stringify({ prompt, width: 832, height: 1440, safety_tolerance: 2, output_format: 'jpeg' }) });
+    if (!submit.ok) throw new Error(`bfl submit ${submit.status}: ${(await submit.text()).slice(0, 160)}`);
+    const job = (await submit.json()) as { id: string; polling_url?: string };
+    const pollUrl = job.polling_url ?? `${this.base}/v1/get_result?id=${job.id}`;
+    for (let i = 0; i < 120; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const r = await fetch(pollUrl.includes('?') ? pollUrl : `${pollUrl}?id=${job.id}`, { headers: { 'x-key': this.key, accept: 'application/json' }, signal });
+      if (!r.ok) throw new Error(`bfl poll ${r.status}`);
+      const d = (await r.json()) as { status: string; result?: { sample?: string } };
+      if (d.status === 'Ready' && d.result?.sample) {
+        const img = await fetch(d.result.sample, { signal });
+        if (!img.ok) throw new Error(`bfl download ${img.status}`);
+        return Buffer.from(await img.arrayBuffer());
+      }
+      if (d.status === 'Error' || d.status === 'Content Moderated' || d.status === 'Request Moderated') throw new Error(`bfl ${d.status}`);
+    }
+    throw new Error('bfl timeout');
+  }
+}
+
 /** Writes assets under <assetsDir>/<campaignId>/ and returns URLs relative to the bus HTTP server. */
 export class ImageRouter {
   private ollamaEnabled = process.env.OLLAMA_IMAGE_ENABLED === '1';
   private model = process.env.OLLAMA_IMAGE_MODEL ?? 'flux2-klein:4b';
   private available: { value: boolean; at: number } = { value: false, at: 0 };
+  private bfl = new BflFluxProvider();
+  forcedOffline = false;
 
   constructor(private bus: Bus, private assetsDir: string | null) {}
 
-  async providerName(): Promise<ImageProviderName> { return (await this.ollamaUp()) ? 'ollama-image' : 'svg-template'; }
+  async providerName(): Promise<ImageProviderName> {
+    if (this.bfl.enabled && !this.forcedOffline) return 'bfl-flux';
+    return (await this.ollamaUp()) ? 'ollama-image' : 'svg-template';
+  }
 
   private async ollamaUp(): Promise<boolean> {
     if (!this.ollamaEnabled) return false;
@@ -93,8 +130,20 @@ export class ImageRouter {
     catch (e) { console.warn('[image] jpeg render failed, serving svg', e); return this.save(req.campaignId, 'poster.svg', svg); }
   }
 
-  /** A generated hero image when a local image model is available; null otherwise. */
+  /** A generated hero image: hosted FLUX when a key is present and we are online, else a local image model, else null. */
   async generate(req: ImageRequest): Promise<ImageResult | null> {
+    if (this.bfl.enabled && !this.forcedOffline) {
+      const t0 = Date.now();
+      try {
+        const raw = await this.bfl.generate(req.prompt, AbortSignal.timeout(Number(process.env.FLUX_TIMEOUT_MS ?? 180_000)));
+        const url = this.save(req.campaignId, 'image.jpg', await toPortraitJpeg(raw));
+        this.bus.publish('router', 'llm.call', { agent: 'campaign', task: 'image', provider: 'bfl-flux', ms: Date.now() - t0, ok: true });
+        return { url, provider: 'bfl-flux' };
+      } catch (e) {
+        this.bus.publish('router', 'llm.call', { agent: 'campaign', task: 'image', provider: 'bfl-flux', ms: Date.now() - t0, ok: false, error: String(e).slice(0, 120) });
+        console.warn('[image] bfl failed, trying local/template:', String(e).slice(0, 160));
+      }
+    }
     if (!(await this.ollamaUp())) return null;
     const t0 = Date.now();
     try {
