@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Storefront TV</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body { font-family: "Helvetica Neue", system-ui, sans-serif; background: #111; color: #f5f1e8; overflow: hidden; }
+      #tv { position: fixed; inset: 0; display: grid; place-items: center; transition: background .6s ease; background: radial-gradient(1200px 800px at 30% 20%, #2a2420, #111); }
+      .screen { width: min(92vw, 1400px); aspect-ratio: 16/9; display: flex; flex-direction: column; justify-content: center; padding: 6vmin; position: relative; }
+      /* idle */
+      #idle .brand { font-size: 7vmin; font-weight: 700; letter-spacing: .02em; }
+      #idle .tag { font-size: 2.6vmin; color: #cdbfa8; margin-top: 1vmin; }
+      #idle .menu { margin-top: 6vmin; display: grid; grid-template-columns: 1fr 1fr; gap: 1.6vmin 6vmin; font-size: 3vmin; }
+      #idle .menu div { display: flex; justify-content: space-between; border-bottom: 1px dotted #5a5047; padding-bottom: .6vmin; }
+      #idle .menu span:last-child { color: #e9b44c; }
+      #clock { position: absolute; top: 4vmin; right: 6vmin; font-size: 3vmin; color: #cdbfa8; font-variant-numeric: tabular-nums; }
+      /* promo */
+      #promo { display: none; text-align: center; }
+      #promo.on { display: flex; }
+      #promo .badge { align-self: center; font-size: 2.4vmin; letter-spacing: .3em; text-transform: uppercase; opacity: .85; margin-bottom: 2vmin; }
+      #promo .head { font-size: 11vmin; font-weight: 800; line-height: 1.05; }
+      #promo .sub { font-size: 4vmin; margin-top: 2vmin; opacity: .95; }
+      #promo .row { display: flex; justify-content: center; gap: 6vmin; margin-top: 5vmin; align-items: center; }
+      #promo .code { font-size: 3.2vmin; border: .4vmin dashed currentColor; padding: 1.2vmin 2.4vmin; border-radius: 1vmin; letter-spacing: .15em; }
+      #promo .count { font-size: 3.2vmin; font-variant-numeric: tabular-nums; }
+      #promo .count b { font-size: 6vmin; display: block; }
+      #promo .foot { position: absolute; bottom: 4vmin; left: 0; right: 0; font-size: 2.4vmin; opacity: .8; }
+      .pulse { animation: pulse 1.6s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+      #status { position: fixed; left: 12px; bottom: 10px; font-size: 11px; color: #777; }
+      #status b { color: #bbb; }
+    </style>
+  </head>
+  <body>
+    <div id="tv">
+      <div class="screen" id="idle">
+        <div id="clock">00:00</div>
+        <div class="brand">Market St. Café</div>
+        <div class="tag">Coffee · Small plates · Wine · Open 7am to 9pm</div>
+        <div class="menu" id="menu"></div>
+      </div>
+      <div class="screen" id="promo">
+        <div class="badge">Flash deal · right now</div>
+        <div class="head pulse" id="p-head"></div>
+        <div class="sub" id="p-sub"></div>
+        <div class="row">
+          <div class="code">CODE <span id="p-code"></span></div>
+          <div class="count"><b id="p-count">30:00</b>left</div>
+        </div>
+        <div class="foot" id="p-foot">Show this screen or your text message at the counter</div>
+      </div>
+    </div>
+    <div id="status">mesh: <b id="s-conn">connecting…</b> · brain: <b id="s-prov">–</b></div>
+    <script type="module" src="/src/tv/main.ts"></script>
+  </body>
+</html>

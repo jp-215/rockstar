@@ -1,0 +1,25 @@
+{
+  "name": "storefront",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev -w frontend",
+    "backend": "npm run start -w backend",
+    "backend:dev": "npm run dev -w backend",
+    "dev:all": "concurrently -n frontend,backend -c cyan,magenta \"npm run dev -w frontend\" \"npm run dev -w backend\"",
+    "test": "npm run test -w backend",
+    "build": "npm run build -w frontend",
+    "typecheck": "npm run typecheck -w frontend && npm run typecheck -w backend"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ]
+}

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Street Storefront Simulator</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root { color-scheme: dark; --bg: rgba(18, 20, 26, 0.86); --line: #2b303b; --muted: #8a93a6; }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0e0f12; color: #e6e6e6; overflow: hidden; }
+      #view { position: fixed; inset: 0; }
+      #view canvas { display: block; width: 100% !important; height: 100% !important; }
+
+      /* Top HUD */
+      #hud { position: fixed; z-index: 10; top: 12px; left: 12px; right: 12px; display: flex; gap: 10px; align-items: flex-start; pointer-events: none; flex-wrap: wrap; }
+      .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; pointer-events: auto; backdrop-filter: blur(8px); }
+      .seg button { background: transparent; border: 0; border-right: 1px solid var(--line); color: #c3c8d3; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+      .seg button:last-child { border-right: 0; }
+      .seg button.on { background: #2f6fed; color: #fff; }
+      .seg button:hover:not(.on) { background: #262b36; }
+      .seg .lbl { padding: 7px 10px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; border-right: 1px solid var(--line); align-self: center; }
+      #hud .spacer { flex: 1; }
+      #ticker { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 12px; color: #c3c8d3; pointer-events: auto; backdrop-filter: blur(8px); }
+      #ticker b { color: #fff; font-variant-numeric: tabular-nums; }
+
+      /* Right drawer */
+      #panel { position: fixed; z-index: 5; top: 0; right: 0; bottom: 0; width: 350px; background: var(--bg); border-left: 1px solid var(--line); overflow-y: auto; padding: 56px 14px 20px; font-size: 13px; backdrop-filter: blur(10px); transition: transform .25s ease; }
+      #panel.hidden { transform: translateX(100%); }
+      #panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 16px 0 6px; }
+      .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+      .stat { background: rgba(255,255,255,0.05); border-radius: 6px; padding: 8px; }
+      .stat .v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+      .stat .l { font-size: 10px; color: var(--muted); }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 5px 0; }
+      .row label { flex: 1; color: #c3c8d3; }
+      .row input[type=range] { flex: 1.3; }
+      .row input[type=text], .row select, .row input[type=number] { flex: 1.3; background: #1a1d24; color: #e6e6e6; border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; font-size: 12px; }
+      .row .val { width: 42px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+      button.btn { background: #2a2f3a; color: #e6e6e6; border: 1px solid #3a4150; border-radius: 5px; padding: 5px 10px; cursor: pointer; }
+      button.btn:hover { background: #343a47; }
+      #alerts { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+      .alert { border-left: 3px solid #e0a83a; background: rgba(255,255,255,0.05); padding: 6px 8px; border-radius: 4px; }
+      .alert.opportunity { border-color: #4fc27a; }
+      .alert.warn { border-color: #e05a4f; }
+      .alert .t { font-size: 11px; color: var(--muted); }
+      .alert .m { font-size: 12px; }
+      #heat { display: grid; grid-template-columns: repeat(16, 1fr); gap: 2px; height: 24px; }
+      #heat div { background: rgba(255,255,255,0.05); border-radius: 2px; }
+      .hint { font-size: 11px; color: #6f778a; margin-top: 4px; }
+      .camp { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+      .camp.live { border-color: #4fc27a; box-shadow: 0 0 0 1px rgba(79,194,122,.25) inset; }
+      #pip { position: fixed; left: 12px; bottom: 12px; border: 1px solid #3a4150; font-size: 11px; color: var(--muted); padding: 2px 6px; background: rgba(0,0,0,.4); pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="view"></div>
+    <div id="pip">storefront camera</div>
+
+    <div id="hud">
+      <div class="seg" id="views">
+        <span class="lbl">View</span>
+        <button data-view="external" class="on">Street</button>
+        <button data-view="camera">Storefront cam</button>
+        <button data-view="interior">Inside</button>
+      </div>
+      <div class="seg" id="scenarios">
+        <span class="lbl">Scenario</span>
+        <button data-scenario="regular" class="on">Regular day</button>
+        <button data-scenario="rainy">Rainy day</button>
+        <button data-scenario="rush">Dinner rush</button>
+        <button data-scenario="dead">Dead hours</button>
+      </div>
+      <div class="seg">
+        <button id="c-pause">Pause</button>
+        <button id="c-reset">Reset</button>
+      </div>
+      <div class="spacer"></div>
+      <div id="ticker"><b id="t-look">0%</b> look rate · <b id="t-inside">0</b> inside · <b id="t-clock">0:00</b> · <span id="t-mesh">mesh off</span></div>
+      <div class="seg"><button id="c-panel" class="on">Panel</button></div>
+    </div>
+
+    <aside id="panel">
+      <h2>Live (last 60 s)</h2>
+      <div class="stats">
+        <div class="stat"><div class="v" id="s-pass">0</div><div class="l">passersby / min</div></div>
+        <div class="stat"><div class="v" id="s-look">0%</div><div class="l">look rate</div></div>
+        <div class="stat"><div class="v" id="s-dwell">0.0s</div><div class="l">avg gaze</div></div>
+        <div class="stat"><div class="v" id="s-enter">0</div><div class="l">walk-ins</div></div>
+        <div class="stat"><div class="v" id="s-buy">0</div><div class="l">purchases</div></div>
+        <div class="stat"><div class="v" id="s-inside">0.0s</div><div class="l">avg visit</div></div>
+      </div>
+      <div class="hint" id="s-live">0 on sidewalk · 0 looking now · 0 inside</div>
+
+      <h2>Gaze heatmap (west → east)</h2>
+      <div id="heat"></div>
+
+      <h2>Alerts</h2>
+      <div id="alerts"></div>
+
+      <h2>Campaign</h2>
+      <div class="camp" id="camp">
+        <div class="row"><label><b>Campaign live</b></label><input type="checkbox" id="m-active"></div>
+        <div class="row"><label>Headline</label><input type="text" id="m-head" value="Happy Hour 4–6" maxlength="28"></div>
+        <div class="row"><label>Subline</label><input type="text" id="m-sub" value="Half-price small plates" maxlength="40"></div>
+        <div class="row"><label>Colour</label><select id="m-color"><option value="red">Red</option><option value="teal">Teal</option><option value="gold">Gold</option><option value="black">Black</option></select></div>
+        <div class="row"><label>Window poster</label><input type="checkbox" id="m-poster" checked></div>
+        <div class="row"><label>Banner above sign</label><input type="checkbox" id="m-banner" checked></div>
+        <div class="row"><label>Print on A-frame</label><input type="checkbox" id="m-aframe" checked></div>
+        <div class="hint">Live campaigns raise attractiveness and the odds a visitor buys.</div>
+      </div>
+
+      <h2>Storefront</h2>
+      <div class="row"><label>Sign brightness</label><input type="range" id="k-sign" min="0" max="1" step="0.05" value="0.4"><span class="val" id="k-sign-v"></span></div>
+      <div class="row"><label>Awning</label><input type="checkbox" id="k-awning"></div>
+      <div class="row"><label>Window display</label><input type="checkbox" id="k-window"></div>
+      <div class="row"><label>Sidewalk A-frame sign</label><input type="checkbox" id="k-aframe"></div>
+      <div class="hint" id="k-attr">attractiveness 0.00</div>
+
+      <h2>Simulation</h2>
+      <div class="row"><label>Speed</label><input type="range" id="c-speed" min="0.25" max="4" step="0.25" value="1"><span class="val" id="c-speed-v"></span></div>
+      <div class="row"><label>Spawn rate (/min)</label><input type="range" id="c-spawn" min="0" max="150" step="2" value="40"><span class="val" id="c-spawn-v"></span></div>
+      <div class="row"><label>Seed</label><input type="number" id="c-seed" value="1"></div>
+      <div class="hint">Scenarios set spawn rate, interest, walking speed, weather and lighting. The slider overrides spawn rate until the next scenario change.</div>
+
+      <h2>Debug</h2>
+      <div class="row"><label>Gaze rays</label><input type="checkbox" id="d-rays" checked></div>
+      <div class="row"><label>Camera frustum</label><input type="checkbox" id="d-frustum" checked></div>
+      <div class="row"><label>Attention zone</label><input type="checkbox" id="d-zone" checked></div>
+      <div class="row"><label>Camera PiP (street view)</label><input type="checkbox" id="d-pip" checked></div>
+      <div class="hint">Events are logged to the browser console.</div>
+    </aside>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
