@@ -54,6 +54,7 @@ export class Storefront {
   private screenMat: THREE.MeshBasicMaterial;
   private screenIdleTex: THREE.CanvasTexture;
   private screenLight: THREE.PointLight;
+  private screenMeshTex: THREE.Texture | null = null;   // image pushed by the campaign agent, wins over the panel text
 
   constructor() {
     const S = CONFIG.storefront;
@@ -210,8 +211,9 @@ export class Storefront {
     this.screenLight.position.set(tvX, 1.4, tvZ + 0.4);
     g.add(this.screenLight);
 
-    // ---------- Campaign banner above the sign ----------
-    this.bannerMat = std(0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.3, side: THREE.DoubleSide });
+    // ---------- Restaurant name board above the sign (never carries campaigns) ----------
+    const nameTex = makeTextTexture('Market St. Café', 'coffee · small plates · wine · 7am to 9pm', PALETTE.black, 1024, 128, true);
+    this.bannerMat = std(0xffffff, { map: nameTex, emissive: 0xffffff, emissiveMap: nameTex, emissiveIntensity: 0.35, side: THREE.DoubleSide });
     this.banner = new THREE.Mesh(new THREE.PlaneGeometry(S.width - 1.6, 0.9), this.bannerMat);
     this.banner.position.set(S.centerX, 5.1, z + 0.35);
     g.add(this.banner);
@@ -252,27 +254,33 @@ export class Storefront {
     this.campaign = { ...c };
     const pal = PALETTE[c.color];
     const show = c.active && c.headline.trim().length > 0;
-    this.banner.visible = show && c.banner;
-    if (show) {
-      const bannerTex = makeTextTexture(c.headline, c.subline, pal, 1024, 128, true);
-      this.bannerMat.map?.dispose(); this.bannerMat.map = bannerTex; this.bannerMat.emissiveMap = bannerTex;
-      this.bannerMat.needsUpdate = true;
+    // The window TV always carries the active campaign: the agent's 1080×1920 image when one was
+    // pushed, otherwise a portrait text poster built from the panel's headline; idle screen when none.
+    if (!this.screenMeshTex) {
+      if (show) { const tex = makeTextTexture(c.headline, c.subline, pal, 540, 960); this.swapScreen(tex, 8); }
+      else this.swapScreen(this.screenIdleTex, 3);
     }
     const afTex = show && c.aFrame ? makeTextTexture(c.headline, c.subline, pal, 256, 384) : this.aFrameDefaultTex;
     if (this.aFrameFace.map !== afTex && this.aFrameFace.map !== this.aFrameDefaultTex) this.aFrameFace.map?.dispose();
     this.aFrameFace.map = afTex; this.aFrameFace.emissiveMap = afTex; this.aFrameFace.needsUpdate = true;
   }
 
-  /** Put a 1080×1920 campaign image on the storefront TV; null returns it to the idle menu screen. */
+  private swapScreen(tex: THREE.Texture, light: number) {
+    const old = this.screenMat.map;
+    this.screenMat.map = tex; this.screenMat.needsUpdate = true; this.screenLight.intensity = light;
+    if (old && old !== tex && old !== this.screenIdleTex && old !== this.screenMeshTex) old.dispose();
+  }
+
+  /** Put the campaign agent's 1080×1920 image on the storefront TV; null hands the screen back to the panel campaign / idle. */
   setScreenImage(url: string | null) {
-    if (!url) { this.screenMat.map = this.screenIdleTex; this.screenMat.needsUpdate = true; this.screenLight.intensity = 3; return; }
+    if (!url) { this.screenMeshTex?.dispose(); this.screenMeshTex = null; this.applyCampaign(this.campaign); return; }
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin('anonymous');
     loader.load(url, (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
-      if (this.screenMat.map && this.screenMat.map !== this.screenIdleTex) this.screenMat.map.dispose();
-      this.screenMat.map = tex; this.screenMat.needsUpdate = true; this.screenLight.intensity = 8;
-    });
+      this.screenMeshTex?.dispose(); this.screenMeshTex = tex;
+      this.swapScreen(tex, 8);
+    }, undefined, (err) => console.warn('[storefront] TV image failed to load', url, err));
   }
   setZoneVisible(v: boolean) { this.zoneMesh.visible = v; }
   inZone(x: number, z: number): boolean {

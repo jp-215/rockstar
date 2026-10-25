@@ -183,5 +183,5 @@ requestAnimationFrame(frame);
 // Expose for console poking
 (window as unknown as { sim: unknown }).sim = {
   get crowd() { return crowd; }, get simTime() { return simTime; }, get view() { return view; }, get scenario() { return scenario; },
-  storefront, cam, metrics, setView, applyScenario, THREE,
+  storefront, cam, metrics, rig, setView, applyScenario, THREE,
 };

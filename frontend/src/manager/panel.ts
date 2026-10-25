@@ -49,7 +49,7 @@ export class Panel {
     knobs();
 
     const camp = () => { const c = this.readCampaign(); $('camp').classList.toggle('live', c.active); this.setAttractiveness(cb.onCampaign(c)); };
-    for (const id of ['m-active', 'm-head', 'm-sub', 'm-color', 'm-poster', 'm-banner', 'm-aframe']) $(id).addEventListener('input', camp);
+    for (const id of ['m-active', 'm-head', 'm-sub', 'm-color', 'm-aframe']) $(id).addEventListener('input', camp);
     camp();
 
     $('c-pause').addEventListener('click', () => { $('c-pause').textContent = cb.onPause() ? 'Resume' : 'Pause'; });
@@ -75,14 +75,14 @@ export class Panel {
     return {
       active: inp('m-active').checked, headline: inp('m-head').value, subline: inp('m-sub').value,
       color: $<HTMLSelectElement>('m-color').value as CampaignColor,
-      poster: inp('m-poster').checked, banner: inp('m-banner').checked, aFrame: inp('m-aframe').checked,
+      poster: true, banner: false, aFrame: inp('m-aframe').checked,
     };
   }
 
   /** Programmatic campaign update (from the mesh); fires the same handlers as typing. */
   setCampaign(c: Campaign) {
     inp('m-active').checked = c.active; inp('m-head').value = c.headline; inp('m-sub').value = c.subline;
-    $<HTMLSelectElement>('m-color').value = c.color; inp('m-poster').checked = c.poster; inp('m-banner').checked = c.banner; inp('m-aframe').checked = c.aFrame;
+    $<HTMLSelectElement>('m-color').value = c.color; inp('m-aframe').checked = c.aFrame;
     $('m-active').dispatchEvent(new Event('input'));
   }
   selectScenario(id: ScenarioId) { $('scenarios').querySelector<HTMLButtonElement>(`button[data-scenario="${id}"]`)?.click(); }
