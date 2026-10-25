@@ -23,7 +23,8 @@ function showPromo(c: Campaign, exp: number) {
   const th = THEME[c.color] ?? THEME.red;
   $('tv').style.background = c.imageUrl ? `${th.bg}` : th.bg; $('tv').style.color = th.fg;
   const img = $<HTMLImageElement>('p-img');
-  if (c.imageUrl) { img.src = `${HTTP_BASE}${c.imageUrl}`; img.hidden = false; } else img.hidden = true;
+  img.src = `${HTTP_BASE}${c.imageUrl ?? c.posterUrl}`; img.hidden = false;
+  $('p-text').hidden = true;   // the 1080×1920 image carries the message; the countdown stays
   $('idle').style.display = 'none'; $('promo').classList.add('on');
   if (timer) clearInterval(timer);
   const tick = () => {

@@ -53,7 +53,7 @@ while (!seen.some((e) => e.topic === 'campaign.brief') && simTime < t0 + 600) aw
 const b1 = await expect('campaign.brief');
 assert(b1.payload.kind === 'flash', `manager briefed a ${b1.payload.kind} campaign: ${b1.payload.trigger.slice(0, 80)}`);
 const d1 = await expect('campaign.draft', (e) => e.payload.campaign.id === b1.payload.id);
-assert(d1.payload.campaign.discountPct <= 20 && d1.payload.campaign.posterUrl.endsWith('poster.svg'), `draft "${d1.payload.campaign.headline}" with poster ${d1.payload.campaign.posterUrl}`);
+assert(d1.payload.campaign.discountPct <= 20 && d1.payload.campaign.posterUrl.endsWith('poster.jpg'), `draft "${d1.payload.campaign.headline}" with 1080×1920 poster ${d1.payload.campaign.posterUrl}`);
 assert(ownerSays('approval', mark1), 'owner got the approval request on Telegram (manager only)');
 assert(!seenAfter(mark1).some((e) => e.topic === 'owner.message' && e.from !== 'manager'), 'nobody but the manager messaged the owner');
 const live1 = await approve(d1.payload.campaign.id);

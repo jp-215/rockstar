@@ -59,7 +59,7 @@ rockstar/
     index.html          3D simulator                      -> src/main.ts
     tv.html             TV display (kiosk)                -> src/tv/main.ts
     comms.html          Console: owner phone, customer phones, inventory, POS, trace -> src/comms/main.ts
-    src/world/          scene, street block, storefront (interior, campaign surfaces, poster image), weather
+    src/world/          scene, street block, storefront (interior, banner, portrait TV in the window), weather
     src/agents/         pedestrian model, behaviour state machine, crowd spawner
     src/sensing/        storefront camera + gaze detector
     src/manager/        in-browser metrics, alert rules, side panel
@@ -89,7 +89,7 @@ npm run typecheck      # both packages
 npm run build          # frontend production bundle in frontend/dist
 ```
 
-Open three tabs: Sim `/`, TV `/tv.html`, Console `/comms.html`. Optional `.env` (see `.env.example`):
+Open three tabs: Sim `/` (Street and Storefront-cam views), TV `/tv.html` (portrait monitor mirror), Console `/comms.html`. Optional `.env` (see `.env.example`):
 `ANTHROPIC_API_KEY` enables Claude for prose; `TELEGRAM_BOT_TOKEN` + `OWNER_TELEGRAM_CHAT_ID` make the
 owner channel real; `OLLAMA_ENABLED=1` / `OLLAMA_IMAGE_ENABLED=1` switch on local models. On macOS the
 communication agent posts real system notifications; `COMMS_IMESSAGE=1` sends real iMessages.
@@ -138,7 +138,7 @@ Topics are declared once in `shared/mesh-types.ts`. In the order they usually fi
 | `owner.message` | **manager only** → owner adapter, console | brief / approval / lift / alert / report / info |
 | `owner.reply` | owner adapter or console → manager | raw owner text (APPROVE, REJECT, REPORT, STATUS) |
 | `owner.action` / `campaign.approved` / `campaign.rejected` | manager | decision |
-| `display.set` / `display.clear` | campaign → TV, sim | what the TV and storefront show |
+| `display.set` / `display.clear` | campaign → TV page, sim | the campaign JPEG goes onto the storefront TV (sim) and the TV page |
 | `campaign.live` / `campaign.expired` | campaign → communication, POS, manager | lifecycle |
 | `comms.notify` | communication → console | each notification / iMessage / TV push with ok + dryRun |
 | `comms.sent` | communication → manager | broadcast summary |
@@ -168,8 +168,9 @@ through recipes. Alerts once per item per day (expiring) or until restocked (low
 expired stock is thrown out and reported as waste.
 
 **Campaign** (`agents/campaign.ts`). Brief → copy (text model, kind-specific template fallback) →
-clamps (discount ≤ brief max, code `FLASH20` / `WARM15` / `BOGO`) → SVG poster always → hero image
-when `OLLAMA_IMAGE_ENABLED=1` and the model is installed → `campaign.draft`. On approval:
+clamps (discount ≤ brief max, code `FLASH20` / `WARM15` / `BOGO`) → poster always (SVG source rendered
+to a **1080×1920 JPEG** with sharp) → hero image at the same size when `OLLAMA_IMAGE_ENABLED=1` and the
+model is installed → `campaign.draft`. The JPEG is what the storefront TV shows. On approval:
 `display.set` + `campaign.live` and an expiry timer.
 
 **Communication** (`agents/communication.ts`). On `campaign.live`: macOS notification, TV push (the

@@ -40,7 +40,7 @@ export class OwnerTelegram implements OwnerChannel {
 
   async send(text: string, imageUrl?: string | null) {
     try {
-      if (imageUrl && imageUrl.endsWith('.png')) await this.bot.api.sendPhoto(this.chatId, `${this.publicBase}${imageUrl}`, { caption: text });
+      if (imageUrl && /\.(png|jpe?g)$/.test(imageUrl)) await this.bot.api.sendPhoto(this.chatId, `${this.publicBase}${imageUrl}`, { caption: text });
       else await this.bot.api.sendMessage(this.chatId, text);
     } catch (e) { console.warn('[owner] telegram send failed', e); }
   }

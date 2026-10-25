@@ -39,8 +39,8 @@ export interface Campaign {
   customerText: string;        // what customers receive
   color: CampaignColor;
   rationale: string;
-  imageUrl: string | null;     // generated image (FLUX) when available
-  posterUrl: string;           // always present: SVG poster rendered by code
+  imageUrl: string | null;     // generated 1080×1920 JPEG (FLUX) when available
+  posterUrl: string;           // always present: 1080×1920 JPEG poster rendered by code (SVG source saved beside it)
   imageProvider: ImageProviderName;
   trigger: string;
 }

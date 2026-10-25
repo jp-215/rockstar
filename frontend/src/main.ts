@@ -94,19 +94,14 @@ function build() {
 }
 
 // Saved orbit poses per view
-const poses: Record<'external' | 'interior', { pos: THREE.Vector3; target: THREE.Vector3 }> = {
-  external: { pos: rig.camera.position.clone(), target: rig.controls.target.clone() },
-  interior: { pos: storefront.interiorViewpoint.position.clone(), target: storefront.interiorViewpoint.target.clone() },
-};
+const pose = { pos: rig.camera.position.clone(), target: rig.controls.target.clone() };
 function setView(v: ViewMode) {
-  if (view === 'external' || view === 'interior') { poses[view].pos.copy(rig.camera.position); poses[view].target.copy(rig.controls.target); }
+  if (view === 'external') { pose.pos.copy(rig.camera.position); pose.target.copy(rig.controls.target); }
   view = v;
-  const orbit = v === 'external' || v === 'interior';
-  rig.controls.enabled = orbit;
-  if (orbit) { rig.camera.position.copy(poses[v].pos); rig.controls.target.copy(poses[v].target); rig.controls.update(); }
-  storefront.setInteriorView(v === 'interior');
+  rig.controls.enabled = v === 'external';
+  if (v === 'external') { rig.camera.position.copy(pose.pos); rig.controls.target.copy(pose.target); rig.controls.update(); }
   cam.helper.visible = debug.frustum && v !== 'camera';
-  storefront.setZoneVisible(debug.zone && v !== 'interior');
+  storefront.setZoneVisible(debug.zone);
   pipLabel.style.display = debug.pip && v === 'external' ? 'block' : 'none';
 }
 
@@ -130,9 +125,9 @@ mesh.on('display.set', (e) => {
   if (e.payload.expiresAt < Date.now()) return;
   const c = e.payload.campaign;
   panel.setCampaign({ active: true, headline: c.headline, subline: c.subline, color: c.color, poster: true, banner: true, aFrame: true });
-  storefront.setPosterImage(c.imageUrl ? `${HTTP_BASE}${c.imageUrl}` : null);
+  storefront.setScreenImage(`${HTTP_BASE}${c.imageUrl ?? c.posterUrl}`);
 });
-mesh.on('display.clear', () => { panel.setCampaign({ ...panel.readCampaign(), active: false }); storefront.setPosterImage(null); });
+mesh.on('display.clear', () => { panel.setCampaign({ ...panel.readCampaign(), active: false }); storefront.setScreenImage(null); });
 mesh.on('sim.control', (e) => {
   if (e.payload.action === 'scenario') panel.selectScenario(e.payload.scenario as ScenarioId);
   else if (e.payload.action === 'reset') { build(); }

@@ -3,7 +3,7 @@ import { Stats } from './metrics';
 import { Campaign, CampaignColor, StorefrontKnobs } from '../world/storefront';
 import { ScenarioId } from '../config';
 
-export type ViewMode = 'external' | 'camera' | 'interior';
+export type ViewMode = 'external' | 'camera';
 export interface DebugFlags { rays: boolean; frustum: boolean; zone: boolean; pip: boolean }
 
 export interface PanelCallbacks {

@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import sharp from 'sharp';
 import { join } from 'node:path';
 import type { Bus } from '../bus.ts';
 import type { CampaignColor, ImageProviderName } from '../../../shared/mesh-types.ts';
@@ -24,24 +25,36 @@ const PALETTE: Record<CampaignColor, { bg1: string; bg2: string; fg: string; acc
 };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 
-/** Deterministic 16:9 poster. Always available; this is the offline floor for the campaign agent. */
+/** Deterministic portrait poster, 1080×1920 (the storefront TV). Always available: the offline floor. */
+export const POSTER_W = 1080, POSTER_H = 1920;
 export function renderPosterSvg(req: ImageRequest): string {
   const p = PALETTE[req.color];
-  const items = req.items.slice(0, 3).map(esc).join(' · ');
-  const headSize = req.headline.length > 22 ? 84 : 112;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-  <defs><radialGradient id="g" cx="30%" cy="20%" r="90%"><stop offset="0" stop-color="${p.bg1}"/><stop offset="1" stop-color="${p.bg2}"/></radialGradient></defs>
-  <rect width="1280" height="720" fill="url(#g)"/>
+  const items = req.items.slice(0, 3).map(esc);
+  const headWords = req.headline.split(' ');
+  // wrap the headline onto up to 3 lines of ~12 characters
+  const lines: string[] = []; let cur = '';
+  for (const w of headWords) { if ((cur + ' ' + w).trim().length > 13 && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
+  if (cur) lines.push(cur);
+  const headSize = lines.some((l) => l.length > 11) ? 128 : 150;
+  const headY = 620 - (lines.length - 1) * (headSize * 0.55);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${POSTER_W}" height="${POSTER_H}" viewBox="0 0 ${POSTER_W} ${POSTER_H}">
+  <defs><radialGradient id="g" cx="30%" cy="15%" r="110%"><stop offset="0" stop-color="${p.bg1}"/><stop offset="1" stop-color="${p.bg2}"/></radialGradient></defs>
+  <rect width="${POSTER_W}" height="${POSTER_H}" fill="url(#g)"/>
   <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif" text-anchor="middle" fill="${p.fg}">
-    <text x="640" y="150" font-size="28" letter-spacing="8" opacity="0.85">MARKET ST. CAFÉ · TODAY</text>
-    <text x="640" y="330" font-size="${headSize}" font-weight="800">${esc(req.headline)}</text>
-    <text x="640" y="400" font-size="40" opacity="0.95">${esc(req.subline)}</text>
-    ${items ? `<text x="640" y="470" font-size="34" fill="${p.accent}">${items}</text>` : ''}
-    <rect x="440" y="520" width="400" height="84" rx="14" fill="none" stroke="${p.fg}" stroke-width="5" stroke-dasharray="14 10"/>
-    <text x="640" y="576" font-size="40" letter-spacing="6">CODE ${esc(req.code)}</text>
-    <text x="640" y="670" font-size="26" opacity="0.8">Show this screen or your message at the counter</text>
+    <text x="540" y="260" font-size="34" letter-spacing="10" opacity="0.85">MARKET ST. CAFÉ · TODAY</text>
+    ${lines.map((l, i) => `<text x="540" y="${headY + i * headSize * 1.1}" font-size="${headSize}" font-weight="800">${esc(l)}</text>`).join('')}
+    <text x="540" y="${headY + lines.length * headSize * 1.1 + 40}" font-size="52" opacity="0.95">${esc(req.subline)}</text>
+    ${items.map((it, i) => `<text x="540" y="${1150 + i * 70}" font-size="54" fill="${p.accent}">${it}</text>`).join('')}
+    <rect x="290" y="1440" width="500" height="110" rx="18" fill="none" stroke="${p.fg}" stroke-width="6" stroke-dasharray="18 12"/>
+    <text x="540" y="1515" font-size="54" letter-spacing="8">CODE ${esc(req.code)}</text>
+    <text x="540" y="1720" font-size="34" opacity="0.8">Show this screen or your message at the counter</text>
   </g>
 </svg>`;
+}
+
+/** Rasterizes any image buffer or SVG to a 1080×1920 JPEG (cover-fit). */
+export async function toPortraitJpeg(input: Buffer): Promise<Buffer> {
+  return sharp(input).resize(POSTER_W, POSTER_H, { fit: 'cover', position: 'centre' }).jpeg({ quality: 88 }).toBuffer();
 }
 
 /** Writes assets under <assetsDir>/<campaignId>/ and returns URLs relative to the bus HTTP server. */
@@ -72,8 +85,13 @@ export class ImageRouter {
     return `/assets/${campaignId}/${file}`;
   }
 
-  /** The SVG poster is always produced. */
-  poster(req: ImageRequest): string { return this.save(req.campaignId, 'poster.svg', renderPosterSvg(req)); }
+  /** The poster is always produced: SVG source plus a 1080×1920 JPEG for the storefront TV. Returns the JPEG URL. */
+  async poster(req: ImageRequest): Promise<string> {
+    const svg = renderPosterSvg(req);
+    this.save(req.campaignId, 'poster.svg', svg);
+    try { return this.save(req.campaignId, 'poster.jpg', await toPortraitJpeg(Buffer.from(svg))); }
+    catch (e) { console.warn('[image] jpeg render failed, serving svg', e); return this.save(req.campaignId, 'poster.svg', svg); }
+  }
 
   /** A generated hero image when a local image model is available; null otherwise. */
   async generate(req: ImageRequest): Promise<ImageResult | null> {
@@ -83,13 +101,13 @@ export class ImageRouter {
       // Ollama's experimental image generation exposes an OpenAI-compatible endpoint.
       const r = await fetch(`${OLLAMA_URL}/v1/images/generations`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(Number(process.env.OLLAMA_IMAGE_TIMEOUT_MS ?? 180_000)),
-        body: JSON.stringify({ model: this.model, prompt: req.prompt, n: 1, size: '1024x576', response_format: 'b64_json' }),
+        body: JSON.stringify({ model: this.model, prompt: req.prompt, n: 1, size: `${POSTER_W}x${POSTER_H}`, response_format: 'b64_json' }),
       });
       if (!r.ok) throw new Error(`image endpoint ${r.status}`);
       const d = (await r.json()) as { data?: { b64_json?: string }[] };
       const b64 = d.data?.[0]?.b64_json;
       if (!b64) throw new Error('no image data');
-      const url = this.save(req.campaignId, 'image.png', Buffer.from(b64, 'base64'));
+      const url = this.save(req.campaignId, 'image.jpg', await toPortraitJpeg(Buffer.from(b64, 'base64')));
       this.bus.publish('router', 'llm.call', { agent: 'campaign', task: 'image', provider: 'ollama-image', ms: Date.now() - t0, ok: true });
       return { url, provider: 'ollama-image' };
     } catch (e) {

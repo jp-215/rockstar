@@ -21,6 +21,7 @@
       #clock { position: absolute; top: 4vmin; right: 6vmin; font-size: 3vmin; color: #cdbfa8; font-variant-numeric: tabular-nums; }
       /* promo */
       #promo { display: none; text-align: center; }
+      #promo.on { aspect-ratio: 9/16; width: min(92vw, 56vh * 9 / 16 * 1.8); height: 92vh; }
       #promo.on { display: flex; }
       #promo .badge { align-self: center; font-size: 2.4vmin; letter-spacing: .3em; text-transform: uppercase; opacity: .85; margin-bottom: 2vmin; }
       #promo .head { font-size: 11vmin; font-weight: 800; line-height: 1.05; }
@@ -45,14 +46,14 @@
         <div class="menu" id="menu"></div>
       </div>
       <div class="screen" id="promo">
-        <img id="p-img" alt="" hidden style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.35; border-radius:2vmin; z-index:-1" />
-        <div class="badge" id="p-kind">Flash deal · right now</div>
-        <div class="head pulse" id="p-head"></div>
-        <div class="sub" id="p-sub"></div>
-        <div class="row">
-          <div class="code">CODE <span id="p-code"></span></div>
-          <div class="count"><b id="p-count">30:00</b>left</div>
+        <img id="p-img" alt="campaign" hidden style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; z-index:-1" />
+        <div id="p-text">
+          <div class="badge" id="p-kind">Flash deal · right now</div>
+          <div class="head pulse" id="p-head"></div>
+          <div class="sub" id="p-sub"></div>
+          <div class="row"><div class="code">CODE <span id="p-code"></span></div></div>
         </div>
+        <div class="count" style="position:absolute; right:4vmin; top:4vmin; text-align:right"><b id="p-count">30:00</b>left</div>
         <div class="foot" id="p-foot">Show this screen or your text message at the counter</div>
       </div>
     </div>

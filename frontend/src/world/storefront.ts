@@ -37,7 +37,6 @@ export class Storefront {
   readonly counterPoint: THREE.Vector3;
   readonly counterFocus: THREE.Vector3;
   readonly browsePoints: THREE.Vector3[];
-  readonly interiorViewpoint: { position: THREE.Vector3; target: THREE.Vector3 };
   readonly zone: { xMin: number; xMax: number; zMin: number; zMax: number };
   knobs: StorefrontKnobs = { signBrightness: 0.4, awning: false, windowDisplay: false, aFrame: false };
   campaign: Campaign = { active: false, headline: 'Happy Hour 4–6', subline: 'Half-price small plates', color: 'red', poster: true, banner: true, aFrame: true };
@@ -50,12 +49,11 @@ export class Storefront {
   private aFrameFace: THREE.MeshStandardMaterial;
   private aFrameDefaultTex: THREE.CanvasTexture;
   private zoneMesh: THREE.Mesh;
-  private upper: THREE.Group;
-  private ceiling: THREE.Mesh;
-  private poster: THREE.Mesh;
   private banner: THREE.Mesh;
-  private posterMat: THREE.MeshStandardMaterial;
   private bannerMat: THREE.MeshStandardMaterial;
+  private screenMat: THREE.MeshBasicMaterial;
+  private screenIdleTex: THREE.CanvasTexture;
+  private screenLight: THREE.PointLight;
 
   constructor() {
     const S = CONFIG.storefront;
@@ -67,7 +65,6 @@ export class Storefront {
     this.counterPoint = new THREE.Vector3(S.counter[0], 0, S.counter[1]);
     this.counterFocus = new THREE.Vector3(S.counter[0], 1.3, S.counter[1] - 1.2);
     this.browsePoints = S.browsePoints.map(([x, zz]) => new THREE.Vector3(x, 0, zz));
-    this.interiorViewpoint = { position: new THREE.Vector3(4.1, 3.3, z - 0.6), target: new THREE.Vector3(-0.9, 0.8, z - 5.8) };
     this.zone = { xMin: S.centerX - S.zoneHalfWidth, xMax: S.centerX + S.zoneHalfWidth, zMin: CONFIG.street.sidewalkNearZ[0], zMax: CONFIG.street.sidewalkNearZ[1] };
 
     const g = this.group;
@@ -76,13 +73,13 @@ export class Storefront {
     };
 
     // ---------- Upper floors (hidden in interior view) ----------
-    this.upper = new THREE.Group();
+    const upper = new THREE.Group();
     const upH = 3 * 3.6;
-    box(S.width - 0.15, upH, 14, std(0xc9a27a), S.centerX, 3.6 + upH / 2, z - 7, this.upper);
+    box(S.width - 0.15, upH, 14, std(0xc9a27a), S.centerX, 3.6 + upH / 2, z - 7, upper);
     for (let f = 1; f < 4; f++) for (let c = 0; c < 3; c++) {
-      box(1.3, 1.8, 0.1, std(0x3b4a5c, { metalness: 0.3, roughness: 0.2 }), S.centerX - 2.8 + c * 2.8, f * 3.6 + 2, z + 0.06, this.upper);
+      box(1.3, 1.8, 0.1, std(0x3b4a5c, { metalness: 0.3, roughness: 0.2 }), S.centerX - 2.8 + c * 2.8, f * 3.6 + 2, z + 0.06, upper);
     }
-    g.add(this.upper);
+    g.add(upper);
 
     // ---------- Ground floor shell: thin walls so both faces render ----------
     const depth = S.depth;
@@ -95,8 +92,7 @@ export class Storefront {
     box(S.width - 0.3, 3.6, 0.15, wallM, S.centerX, 1.8, backZ + 0.07);          // back wall (interior face)
     const floor = box(S.width - 0.3, 0.1, depth, std(0x6b4a33, { roughness: 0.6 }), S.centerX, 0.05, z - depth / 2);
     floor.castShadow = false;
-    this.ceiling = box(S.width - 0.3, 0.1, depth, std(0xf4f1ea), S.centerX, 3.55, z - depth / 2);
-    this.ceiling.castShadow = false;
+    box(S.width - 0.3, 0.1, depth, std(0xf4f1ea), S.centerX, 3.55, z - depth / 2).castShadow = false;
     // Front wall pieces: left pier | window | pier | door opening | right pier
     const winX0 = S.centerX - halfW + 0.5, winX1 = S.doorX - 2.2;
     const doorW = 1.4, doorX0 = S.doorX - doorW / 2, doorX1 = S.doorX + doorW / 2;
@@ -180,7 +176,7 @@ export class Storefront {
     for (let i = 0; i < 5; i++) {
       const hgt = 0.4 + (i % 3) * 0.3;
       const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, hgt, 0.5), std(colors[i], { emissive: colors[i], emissiveIntensity: 0.25 }));
-      m.position.set(winX0 + 0.6 + i * 0.9, 0.5 + hgt / 2, z - 0.7); m.castShadow = true;
+      m.position.set(winX0 + 0.5 + i * 0.6, 0.5 + hgt / 2, z - 0.7); m.castShadow = true;
       this.display.add(m);
     }
     const spot = new THREE.SpotLight(0xffffff, 40, 6, 0.6, 0.5, 1.5);
@@ -200,12 +196,21 @@ export class Storefront {
     }
     g.add(this.aFrame);
 
-    // ---------- Campaign surfaces ----------
-    this.posterMat = std(0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.35 });
-    this.poster = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.05), this.posterMat);
-    this.poster.position.set(winX1 - 1.0, 2.1, z - 0.25);
-    this.poster.castShadow = false;
-    g.add(this.poster);
+    // ---------- Storefront TV: portrait 9:16 screen standing in the display window ----------
+    const tvW = 0.9, tvH = 1.6, tvX = winX1 - 0.9, tvZ = z - 0.45;
+    const bezel = box(tvW + 0.06, tvH + 0.06, 0.06, std(0x111111, { roughness: 0.4, metalness: 0.3 }), tvX, 0.5 + tvH / 2 + 0.03, tvZ);
+    bezel.castShadow = true;
+    box(0.5, 0.04, 0.3, std(0x111111), tvX, 0.52, tvZ + 0.05);   // stand
+    this.screenIdleTex = makeTextTexture('Market St. Café', 'coffee · plates · wine', PALETTE.black, 540, 960);
+    this.screenMat = new THREE.MeshBasicMaterial({ map: this.screenIdleTex, toneMapped: false });
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(tvW, tvH), this.screenMat);
+    screen.position.set(tvX, 0.5 + tvH / 2 + 0.03, tvZ + 0.031);
+    g.add(screen);
+    this.screenLight = new THREE.PointLight(0xffffff, 3, 4, 2);
+    this.screenLight.position.set(tvX, 1.4, tvZ + 0.4);
+    g.add(this.screenLight);
+
+    // ---------- Campaign banner above the sign ----------
     this.bannerMat = std(0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.3, side: THREE.DoubleSide });
     this.banner = new THREE.Mesh(new THREE.PlaneGeometry(S.width - 1.6, 0.9), this.bannerMat);
     this.banner.position.set(S.centerX, 5.1, z + 0.35);
@@ -247,32 +252,28 @@ export class Storefront {
     this.campaign = { ...c };
     const pal = PALETTE[c.color];
     const show = c.active && c.headline.trim().length > 0;
-    this.poster.visible = show && c.poster;
     this.banner.visible = show && c.banner;
     if (show) {
-      const posterTex = makeTextTexture(c.headline, c.subline, pal, 512, 360);
       const bannerTex = makeTextTexture(c.headline, c.subline, pal, 1024, 128, true);
-      this.posterMat.map?.dispose(); this.posterMat.map = posterTex; this.posterMat.emissiveMap = posterTex;
       this.bannerMat.map?.dispose(); this.bannerMat.map = bannerTex; this.bannerMat.emissiveMap = bannerTex;
-      this.posterMat.needsUpdate = this.bannerMat.needsUpdate = true;
+      this.bannerMat.needsUpdate = true;
     }
     const afTex = show && c.aFrame ? makeTextTexture(c.headline, c.subline, pal, 256, 384) : this.aFrameDefaultTex;
     if (this.aFrameFace.map !== afTex && this.aFrameFace.map !== this.aFrameDefaultTex) this.aFrameFace.map?.dispose();
     this.aFrameFace.map = afTex; this.aFrameFace.emissiveMap = afTex; this.aFrameFace.needsUpdate = true;
   }
 
-  /** Show a generated campaign image on the window poster; null restores the text poster. */
-  setPosterImage(url: string | null) {
-    if (!url) { this.applyCampaign(this.campaign); return; }
+  /** Put a 1080×1920 campaign image on the storefront TV; null returns it to the idle menu screen. */
+  setScreenImage(url: string | null) {
+    if (!url) { this.screenMat.map = this.screenIdleTex; this.screenMat.needsUpdate = true; this.screenLight.intensity = 3; return; }
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin('anonymous');
     loader.load(url, (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
-      this.posterMat.map = tex; this.posterMat.emissiveMap = tex; this.posterMat.needsUpdate = true; this.poster.visible = true;
+      if (this.screenMat.map && this.screenMat.map !== this.screenIdleTex) this.screenMat.map.dispose();
+      this.screenMat.map = tex; this.screenMat.needsUpdate = true; this.screenLight.intensity = 8;
     });
   }
-
-  setInteriorView(v: boolean) { this.ceiling.visible = !v; this.upper.visible = !v; }
   setZoneVisible(v: boolean) { this.zoneMesh.visible = v; }
   inZone(x: number, z: number): boolean {
     return x >= this.zone.xMin && x <= this.zone.xMax && z >= this.zone.zMin && z <= this.zone.zMax;

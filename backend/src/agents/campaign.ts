@@ -50,7 +50,7 @@ export class CampaignAgent {
     const code = b.kind === 'bogo' ? 'BOGO' : b.kind === 'winback' ? `WARM${discountPct}` : `FLASH${discountPct}`;
     const base = { id: b.id, kind: b.kind, headline: value.headline, subline: value.subline, offer: value.offer, discountPct, durationMin: b.durationMin, code, items: b.items, customerText: value.customerText.includes(code) ? value.customerText : `${value.customerText} Code ${code}.`, color: value.color, rationale: value.rationale, trigger: b.trigger };
     const imgReq = { campaignId: b.id, prompt: value.imagePrompt, headline: base.headline, subline: base.subline, offer: base.offer, code, color: base.color, items: b.items };
-    const posterUrl = this.images.poster(imgReq);
+    const posterUrl = await this.images.poster(imgReq);
     const img = await this.images.generate(imgReq);
     const campaign: Campaign = { ...base, posterUrl, imageUrl: img?.url ?? null, imageProvider: img?.provider ?? 'svg-template' };
     this.drafts.set(campaign.id, campaign);
