@@ -1,61 +1,147 @@
-// Shared message contracts between the sim (browser), the mesh (Node), and the TV / Comms pages.
+// Shared message contracts between the sim (browser), the backend mesh (Node), and the TV / Comms pages.
+//
+// Hierarchy: the Manager agent supervises four sub-agents (communication, inventory, analytics,
+// campaign). Only the Manager talks to the store owner (Telegram). Sub-agents publish to the bus;
+// the Manager decides.
 
 export type Provider = 'claude' | 'ollama' | 'template';
-export type AgentName = 'sim' | 'pos' | 'sensing' | 'manager' | 'marketing' | 'messaging' | 'slack' | 'telegram' | 'router' | 'console' | 'tv' | 'test';
+export type ImageProviderName = 'ollama-image' | 'svg-template';
+export type AgentName =
+  | 'sim' | 'pos' | 'manager' | 'communication' | 'inventory' | 'analytics' | 'campaign'
+  | 'owner' | 'router' | 'console' | 'tv' | 'test';
 
-export interface Promo {
+export type Weather = 'clear' | 'rain' | 'overcast' | 'night';
+export type CampaignKind = 'flash' | 'winback' | 'bogo';
+export type CampaignColor = 'red' | 'teal' | 'gold' | 'black';
+
+/** What the manager asks the campaign agent for. */
+export interface CampaignBrief {
   id: string;
-  headline: string;      // e.g. "20% OFF — next 30 min"
-  subline: string;       // e.g. "Show this message at the counter"
-  discountPct: number;   // clamped to policy max
+  kind: CampaignKind;
+  trigger: string;             // human-readable reason
+  items: string[];             // inventory items to push (bogo / winback), empty for flash
+  maxDiscountPct: number;
   durationMin: number;
-  telegramText: string;  // customer-facing message
-  color: 'red' | 'teal' | 'gold' | 'black';
-  code: string;          // promo code used by POS
-  rationale: string;     // why this promo, for the owner
+  metrics?: MetricsSnapshot;
+}
+
+/** A finished campaign: copy + visual assets. */
+export interface Campaign {
+  id: string;
+  kind: CampaignKind;
+  headline: string;            // e.g. "Buy one, get one free"
+  subline: string;             // e.g. "Croissants, today only"
+  offer: string;               // e.g. "BOGO" | "20% off" | "Free coffee with any plate"
+  discountPct: number;         // POS discount applied with the code
+  durationMin: number;
+  code: string;                // promo code for POS
+  items: string[];
+  customerText: string;        // what customers receive
+  color: CampaignColor;
+  rationale: string;
+  imageUrl: string | null;     // generated image (FLUX) when available
+  posterUrl: string;           // always present: SVG poster rendered by code
+  imageProvider: ImageProviderName;
+  trigger: string;
 }
 
 export interface MetricsSnapshot {
   simTime: number;
+  weather: Weather;
   footfallPerMin: number;
-  lookRate: number;        // 0..1
-  walkIns: number;         // in window
-  sales: number;           // count in window
-  revenue: number;         // $ in window
-  conversion: number;      // sales / walkIns (0 when no walk-ins)
+  lookRate: number;            // 0..1
+  walkIns: number;             // in window
+  sales: number;               // count in window
+  revenue: number;             // $ in window
+  conversion: number;          // sales / walkIns
   baseline: { footfallPerMin: number; sales: number; conversion: number };
-  baselineSec: number;     // how much history the baseline covers (0 = none yet)
+  baselineSec: number;         // history the baseline covers (0 = none yet)
   trend: 'up' | 'flat' | 'down';
 }
 
+export interface InventoryItem {
+  sku: string;
+  name: string;
+  qty: number;
+  unit: string;
+  parLevel: number;            // reorder threshold
+  expiresDay: number | null;   // store-day index when it goes bad (null = shelf stable)
+  cost: number;                // $ per unit, for waste accounting
+}
+
+export interface InventoryState {
+  day: number;                 // current store-day index
+  dayLengthSec: number;        // sim-seconds per store day
+  items: InventoryItem[];
+  wasteToday: { sku: string; qty: number; value: number }[];
+}
+
+export interface InventoryAlert {
+  kind: 'expiring' | 'low' | 'wasted';
+  items: { sku: string; name: string; qty: number; daysLeft?: number; parLevel?: number; value?: number }[];
+  text: string;
+}
+
+export interface DailyReport {
+  day: number;
+  periodSec: number;
+  footfall: number;
+  lookRate: number;
+  walkIns: number;
+  sales: number;
+  revenue: number;
+  conversion: number;
+  campaigns: { id: string; kind: CampaignKind; headline: string; redemptions: number; approved: boolean }[];
+  wasteValue: number;
+  wasteAvoidedValue: number;
+  weatherMix: Record<Weather, number>;
+  narrative: string;
+  provider: Provider;
+}
+
 export interface Topics {
-  'sim.footfall': { simTime: number; scenario: string; passersby: number; lookers: number; walkIns: number; windowSec: number };
+  // --- simulator -> mesh
+  'sim.footfall': { simTime: number; scenario: string; weather: Weather; passersby: number; lookers: number; walkIns: number; windowSec: number };
   'sim.purchased': { simTime: number; pedId: number };
   'sim.control': { action: 'scenario'; scenario: string } | { action: 'reset' };
+  // --- POS
   'pos.sale': { id: string; simTime: number; amount: number; items: string[]; promoCode?: string; source: 'sim' | 'manual' };
-  'sensing.report': MetricsSnapshot & { narrative: string; provider: Provider };
-  'manager.opportunity': { reason: string; metrics: MetricsSnapshot };
-  'manager.brief': { text: string; kind: 'brief' | 'lift' | 'security' | 'info' };
-  'manager.lift_report': { before: MetricsSnapshot; after: MetricsSnapshot; promoSales: number; text: string };
-  'marketing.promo_draft': { promo: Promo; provider: Provider };
-  'promo.approval_requested': { promo: Promo; text: string };
-  'promo.approved': { promoId: string; by: string };
-  'promo.rejected': { promoId: string; by: string };
-  'promo.live': { promo: Promo; expiresAt: number };
-  'promo.expired': { promoId: string };
-  'display.set': { promo: Promo; expiresAt: number };
-  'display.clear': { promoId?: string };
-  'messaging.sent': { promoId: string; count: number; recipients: string[]; text: string };
-  'messaging.reply': { chatId: string; text: string };
-  'comms.slack.action': { promoId: string; action: 'approve' | 'reject'; by: string };
-  'comms.slack.post': { text: string; kind: 'brief' | 'approval' | 'lift' | 'security' | 'info'; promoId?: string };
-  'comms.telegram.inbound': { chatId: string; name: string; text: string };
-  'comms.telegram.outbound': { chatId: string; text: string };
-  'customers.updated': { customers: { chatId: string; name: string; optedIn: boolean }[] };
+  // --- analytics (was sensing)
+  'analytics.report': MetricsSnapshot & { narrative: string; provider: Provider };
+  'analytics.daily': DailyReport;
+  'analytics.request': { kind: 'daily'; by: string };
+  // --- inventory
+  'inventory.state': InventoryState;
+  'inventory.alert': InventoryAlert;
+  'inventory.control': { action: 'adjust'; sku: string; delta: number } | { action: 'set_expiry'; sku: string; expiresDay: number | null } | { action: 'advance_day' } | { action: 'restock'; sku: string };
+  // --- manager (supervisor)
+  'manager.decision': { kind: 'campaign' | 'notify' | 'hold'; reason: string; briefId?: string };
+  'manager.lift_report': { before: MetricsSnapshot; after: MetricsSnapshot; redemptions: number; text: string; campaignId: string };
+  // --- campaign agent
+  'campaign.brief': CampaignBrief;
+  'campaign.draft': { campaign: Campaign; provider: Provider };
+  'campaign.approval_requested': { campaign: Campaign; text: string };
+  'campaign.approved': { campaignId: string; by: string };
+  'campaign.rejected': { campaignId: string; by: string };
+  'campaign.live': { campaign: Campaign; expiresAt: number };
+  'campaign.expired': { campaignId: string };
+  'display.set': { campaign: Campaign; expiresAt: number };
+  'display.clear': { campaignId?: string };
+  // --- owner channel (Telegram); only the manager publishes owner.message
+  'owner.message': { text: string; kind: 'brief' | 'approval' | 'lift' | 'alert' | 'report' | 'info'; campaignId?: string; imageUrl?: string | null };
+  'owner.reply': { text: string; by: string };                              // raw inbound from the owner
+  'owner.action': { campaignId: string; action: 'approve' | 'reject'; by: string };
+  // --- communication agent (AppleScript: notifications + iMessage, plus the TV)
+  'comms.notify': { title: string; text: string; channel: 'notification' | 'imessage' | 'tv'; to?: string; ok: boolean; dryRun: boolean };
+  'comms.sent': { campaignId: string; count: number; recipients: string[]; text: string };
+  'comms.customer.inbound': { chatId: string; name: string; text: string };   // untrusted customer text
+  'comms.customer.reply': { chatId: string; text: string };
+  'customers.updated': { customers: { chatId: string; name: string; optedIn: boolean; phone?: string }[] };
   'security.injection_blocked': { chatId: string; excerpt: string; reason: string };
-  'mesh.status': { provider: Provider; online: boolean; forcedOffline: boolean; adapters: { slack: 'mock' | 'real'; telegram: 'mock' | 'real' } };
+  // --- mesh plumbing
+  'mesh.status': { provider: Provider; imageProvider: ImageProviderName; online: boolean; forcedOffline: boolean; owner: 'mock' | 'telegram'; comms: 'mock' | 'applescript' };
   'mesh.control': { action: 'force_offline'; value: boolean } | { action: 'ring_up'; amount: number; promoCode?: string } | { action: 'status' };
-  'llm.call': { agent: AgentName; task: string; provider: Provider; ms: number; ok: boolean; error?: string };
+  'llm.call': { agent: AgentName; task: string; provider: Provider | ImageProviderName; ms: number; ok: boolean; error?: string };
 }
 
 export type Topic = keyof Topics;
@@ -70,4 +156,5 @@ export interface Envelope<T extends Topic = Topic> {
 }
 
 export const WS_PORT = 8787;
-export const WS_URL = `ws://${typeof location !== 'undefined' ? location.hostname : 'localhost'}:${WS_PORT}`;
+export const HTTP_BASE = `http://${typeof location !== 'undefined' ? location.hostname : 'localhost'}:${WS_PORT}`;
+export const WS_URL = `ws://${typeof location !== 'undefined' ? location.hostname : 'localhost'}:${WS_PORT}/ws`;

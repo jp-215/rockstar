@@ -7,6 +7,7 @@ import { TemplateProvider } from './template.ts';
 
 export interface RouterStatus { provider: Provider; online: boolean; forcedOffline: boolean }
 
+
 /**
  * Picks the brain for each call: Claude when online with credentials, else local Ollama, else templates.
  * Connectivity is probed cheaply and cached; connection errors mark us offline for a while.

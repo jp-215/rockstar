@@ -2,14 +2,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { Bus } from './bus.ts';
 import { LLMRouter } from './llm/router.ts';
-import { makeSlack } from './adapters/slack.ts';
-import { makeTelegram } from './adapters/telegram.ts';
+import { ImageRouter } from './llm/image.ts';
+import { makeOwner } from './adapters/owner.ts';
+import { makeComms } from './adapters/applescript.ts';
 import { Customers } from './customers.ts';
 import { MockPOS } from './pos.ts';
-import { SensingAgent } from './agents/sensing.ts';
+import { AnalyticsAgent } from './agents/analytics.ts';
+import { InventoryAgent } from './agents/inventory.ts';
+import { CampaignAgent } from './agents/campaign.ts';
+import { CommunicationAgent } from './agents/communication.ts';
 import { ManagerAgent } from './agents/manager.ts';
-import { MarketingAgent } from './agents/marketing.ts';
-import { MessagingAgent } from './agents/messaging.ts';
 import { WS_PORT } from '../../shared/mesh-types.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -17,24 +19,34 @@ const dataDir = resolve(here, '../data');
 
 export interface MeshOptions { port?: number | null; log?: boolean; demoMinutes?: number }
 
-/** Boots the whole mesh in one process. Returns handles so tests can drive it without sockets. */
+/**
+ * Boots the whole mesh in one process:
+ *   Manager (supervisor, owner channel) ── Communication / Inventory / Analytics / Campaign sub-agents
+ * Returns handles so tests can drive it without sockets.
+ */
 export async function startMesh(opts: MeshOptions = {}) {
-  const bus = new Bus({ port: opts.port === null ? undefined : (opts.port ?? WS_PORT), logPath: opts.log === false ? null : resolve(dataDir, 'log.jsonl') });
+  const port = opts.port === null ? undefined : (opts.port ?? WS_PORT);
+  const persist = opts.log !== false;
+  const bus = new Bus({ port, logPath: persist ? resolve(dataDir, 'log.jsonl') : null, assetsDir: persist ? resolve(dataDir, 'assets') : null });
   const router = new LLMRouter(bus);
-  const slack = makeSlack(bus);
-  const telegram = makeTelegram(bus);
-  const customers = new Customers(bus, opts.log === false ? null : resolve(dataDir, 'customers.json'));
+  const images = new ImageRouter(bus, bus.assetsDir);
+  const publicBase = process.env.MESH_PUBLIC_BASE ?? `http://localhost:${port ?? WS_PORT}`;
+  const owner = makeOwner(bus, publicBase);
+  const comms = makeComms(bus);
+  const customers = new Customers(bus, persist ? resolve(dataDir, 'customers.json') : null);
   const pos = new MockPOS(bus);
+  const demoMinutes = opts.demoMinutes ?? (process.env.MESH_PROMO_MINUTES ? Number(process.env.MESH_PROMO_MINUTES) : undefined);
   const agents = {
-    sensing: new SensingAgent(bus, router),
-    manager: new ManagerAgent(bus, router, slack),
-    marketing: new MarketingAgent(bus, router, { demoMinutes: opts.demoMinutes ?? (process.env.MESH_PROMO_MINUTES ? Number(process.env.MESH_PROMO_MINUTES) : undefined) }),
-    messaging: new MessagingAgent(bus, router, telegram, customers),
+    analytics: new AnalyticsAgent(bus, router),
+    inventory: new InventoryAgent(bus),
+    campaign: new CampaignAgent(bus, router, images, { demoMinutes }),
+    communication: new CommunicationAgent(bus, router, comms, customers),
+    manager: new ManagerAgent(bus, router, owner),
   };
 
   const publishStatus = async () => {
     const s = await router.status();
-    bus.publish('router', 'mesh.status', { ...s, adapters: { slack: slack.kind, telegram: telegram.kind } });
+    bus.publish('router', 'mesh.status', { ...s, imageProvider: await images.providerName(), owner: owner.kind, comms: comms.kind });
   };
   router.onStatus = () => void publishStatus();
   bus.on('mesh.control', (e) => {
@@ -42,14 +54,11 @@ export async function startMesh(opts: MeshOptions = {}) {
     if (e.payload.action === 'status') { void publishStatus(); customers.save(); }
   });
 
-  await slack.start().catch((e) => console.error('[slack] start failed, continuing in mock-visible mode', e));
-  await telegram.start().catch((e) => console.error('[telegram] start failed', e));
+  await owner.start().catch((e) => console.error('[owner] start failed', e));
   await publishStatus();
-  if (router.ollamaModel) console.info(`[mesh] local fallback model: ${router.ollamaModel}`);
   const statusTimer = setInterval(() => void publishStatus(), 20_000);
-
-  console.info(`[mesh] up · slack=${slack.kind} telegram=${telegram.kind}`);
-  return { bus, router, slack, telegram, customers, pos, agents, stop: () => { clearInterval(statusTimer); bus.close(); } };
+  console.info(`[mesh] up · owner=${owner.kind} comms=${comms.kind} assets=${bus.assetsDir ?? 'memory'}`);
+  return { bus, router, images, owner, comms, customers, pos, agents, stop: () => { clearInterval(statusTimer); bus.close(); } };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

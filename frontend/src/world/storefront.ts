@@ -261,6 +261,17 @@ export class Storefront {
     this.aFrameFace.map = afTex; this.aFrameFace.emissiveMap = afTex; this.aFrameFace.needsUpdate = true;
   }
 
+  /** Show a generated campaign image on the window poster; null restores the text poster. */
+  setPosterImage(url: string | null) {
+    if (!url) { this.applyCampaign(this.campaign); return; }
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    loader.load(url, (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      this.posterMat.map = tex; this.posterMat.emissiveMap = tex; this.posterMat.needsUpdate = true; this.poster.visible = true;
+    });
+  }
+
   setInteriorView(v: boolean) { this.ceiling.visible = !v; this.upper.visible = !v; }
   setZoneVisible(v: boolean) { this.zoneMesh.visible = v; }
   inZone(x: number, z: number): boolean {

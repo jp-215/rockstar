@@ -1,12 +1,12 @@
 import { MeshClient } from '../mesh/meshClient';
-import type { Promo } from '../../../shared/mesh-types';
+import { HTTP_BASE, type Campaign } from '../../../shared/mesh-types';
 
-const $ = (id: string) => document.getElementById(id)!;
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const MENU: [string, string][] = [['Flat white', '$5.50'], ['Cortado', '$4.75'], ['Avocado toast', '$12'], ['Small plates', '$14'], ['Glass of wine', '$13'], ['Pastry', '$4.25'], ['Soup of the day', '$9'], ['Cold brew', '$5']];
 $('menu').innerHTML = MENU.map(([n, p]) => `<div><span>${n}</span><span>${p}</span></div>`).join('');
 setInterval(() => { const d = new Date(); $('clock').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }, 1000);
 
-const THEME: Record<Promo['color'], { bg: string; fg: string }> = {
+const THEME: Record<Campaign['color'], { bg: string; fg: string }> = {
   red: { bg: 'radial-gradient(1200px 800px at 30% 20%, #e4553f, #8e2419)', fg: '#fff6ee' },
   teal: { bg: 'radial-gradient(1200px 800px at 30% 20%, #1aa3a8, #0b4d52)', fg: '#f2fbfb' },
   gold: { bg: 'radial-gradient(1200px 800px at 30% 20%, #f7cf5a, #b8860b)', fg: '#2b1d0e' },
@@ -14,13 +14,16 @@ const THEME: Record<Promo['color'], { bg: string; fg: string }> = {
 };
 let expiresAt = 0, timer: number | null = null;
 
-function showPromo(promo: Promo, exp: number) {
+function showPromo(c: Campaign, exp: number) {
   expiresAt = exp;
-  $('p-head').textContent = promo.headline;
-  $('p-sub').textContent = promo.subline;
-  $('p-code').textContent = promo.code;
-  const th = THEME[promo.color] ?? THEME.red;
-  $('tv').style.background = th.bg; $('tv').style.color = th.fg;
+  $('p-head').textContent = c.headline;
+  $('p-sub').textContent = c.subline;
+  $('p-code').textContent = c.code;
+  $('p-kind').textContent = c.kind === 'bogo' ? 'Sell-through · today only' : c.kind === 'winback' ? 'Come in from the weather' : 'Flash deal · right now';
+  const th = THEME[c.color] ?? THEME.red;
+  $('tv').style.background = c.imageUrl ? `${th.bg}` : th.bg; $('tv').style.color = th.fg;
+  const img = $<HTMLImageElement>('p-img');
+  if (c.imageUrl) { img.src = `${HTTP_BASE}${c.imageUrl}`; img.hidden = false; } else img.hidden = true;
   $('idle').style.display = 'none'; $('promo').classList.add('on');
   if (timer) clearInterval(timer);
   const tick = () => {
@@ -39,6 +42,6 @@ function clearPromo() {
 
 const mesh = new MeshClient('tv');
 mesh.onConnection = (c) => { $('s-conn').textContent = c ? 'connected' : 'reconnecting…'; };
-mesh.on('display.set', (e) => { if (e.payload.expiresAt > Date.now()) showPromo(e.payload.promo, e.payload.expiresAt); });
+mesh.on('display.set', (e) => { if (e.payload.expiresAt > Date.now()) showPromo(e.payload.campaign, e.payload.expiresAt); });
 mesh.on('display.clear', () => clearPromo());
-mesh.on('mesh.status', (e) => { $('s-prov').textContent = e.payload.provider + (e.payload.online ? '' : ' (offline)'); });
+mesh.on('mesh.status', (e) => { $('s-prov').textContent = `${e.payload.provider} / ${e.payload.imageProvider}${e.payload.online ? '' : ' (offline)'}`; });

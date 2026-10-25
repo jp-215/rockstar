@@ -14,6 +14,7 @@ import { Metrics } from './manager/metrics';
 import { AlertEngine } from './manager/alerts';
 import { DebugFlags, Panel, ViewMode } from './manager/panel';
 import { MeshClient } from './mesh/meshClient';
+import { HTTP_BASE } from '../../shared/mesh-types';
 
 const container = document.getElementById('view')!;
 const pipLabel = document.getElementById('pip')!;
@@ -54,15 +55,16 @@ bus.on((e) => {
   else if (e.type === 'entered') { foot.passersby++; foot.lookers++; foot.walkIns++; }
   else if (e.type === 'purchased') mesh.publish('sim.purchased', { simTime: e.t, pedId: e.pedId });
 });
+const WEATHER: Record<string, 'clear' | 'rain' | 'overcast' | 'night'> = { regular: 'clear', rainy: 'rain', rush: 'clear', dead: 'night' };
 function flushFootfall() {
-  mesh.publish('sim.footfall', { simTime, scenario, passersby: foot.passersby, lookers: foot.lookers, walkIns: foot.walkIns, windowSec: simTime - foot.lastT });
+  mesh.publish('sim.footfall', { simTime, scenario, weather: WEATHER[scenario] ?? 'clear', passersby: foot.passersby, lookers: foot.lookers, walkIns: foot.walkIns, windowSec: simTime - foot.lastT });
   foot.passersby = foot.lookers = foot.walkIns = 0; foot.lastT = simTime;
 }
 const meshBadge = document.getElementById('t-mesh')!;
 let meshProvider = '–';
 const renderMeshBadge = () => { meshBadge.textContent = `mesh ${mesh.connected ? 'on' : 'off'} · ${meshProvider}`; };
 mesh.onConnection = renderMeshBadge;
-mesh.on('mesh.status', (e) => { meshProvider = e.payload.provider + (e.payload.online ? '' : ' offline'); renderMeshBadge(); });
+mesh.on('mesh.status', (e) => { meshProvider = `${e.payload.provider} · ${e.payload.imageProvider}${e.payload.online ? '' : ' · offline'}`; renderMeshBadge(); });
 
 function applyScenario(id: ScenarioId) {
   scenario = id;
@@ -126,10 +128,11 @@ setView('external');
 
 mesh.on('display.set', (e) => {
   if (e.payload.expiresAt < Date.now()) return;
-  const p = e.payload.promo;
-  panel.setCampaign({ active: true, headline: p.headline, subline: p.subline, color: p.color, poster: true, banner: true, aFrame: true });
+  const c = e.payload.campaign;
+  panel.setCampaign({ active: true, headline: c.headline, subline: c.subline, color: c.color, poster: true, banner: true, aFrame: true });
+  storefront.setPosterImage(c.imageUrl ? `${HTTP_BASE}${c.imageUrl}` : null);
 });
-mesh.on('display.clear', () => panel.setCampaign({ ...panel.readCampaign(), active: false }));
+mesh.on('display.clear', () => { panel.setCampaign({ ...panel.readCampaign(), active: false }); storefront.setPosterImage(null); });
 mesh.on('sim.control', (e) => {
   if (e.payload.action === 'scenario') panel.selectScenario(e.payload.scenario as ScenarioId);
   else if (e.payload.action === 'reset') { build(); }

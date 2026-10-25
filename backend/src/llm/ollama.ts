@@ -35,7 +35,7 @@ export class OllamaProvider implements LLMProvider {
 
   async complete<T>(req: LLMRequest<T>): Promise<T> {
     if (!this.model) throw new Error('no ollama model available');
-    const system = `${req.system}\n\nRespond with ONLY a JSON object, no prose, exactly in this shape (same keys and value types):\n${JSON.stringify(req.example, null, 2)}`;
+    const system = `${req.system}\n\nRespond with ONLY a JSON object, no prose. Use exactly these keys and value types. The values below are PLACEHOLDERS showing the format only; do not copy them, write your own content for this request:\n${JSON.stringify(req.example, null, 2)}`;
     let user = req.user;
     let lastErr: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {

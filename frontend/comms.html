@@ -6,56 +6,65 @@
     <title>Comms Console</title>
     <link rel="icon" href="data:," />
     <style>
-      :root { color-scheme: dark; --bg: #0f1116; --card: #171a21; --line: #272c37; --muted: #8a93a6; --slack: #4a154b; --tg: #2aabee; }
+      :root { color-scheme: dark; --bg: #0f1116; --card: #171a21; --line: #272c37; --muted: #8a93a6; --tg: #2aabee; --im: #34c759; }
       * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; }
-      body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #e6e6e6; font-size: 13px; display: grid; grid-template-rows: 44px 1fr 220px; height: 100vh; }
-      header { display: flex; align-items: center; gap: 14px; padding: 0 14px; border-bottom: 1px solid var(--line); background: #12151b; }
+      body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #e6e6e6; font-size: 13px; display: grid; grid-template-rows: 44px 1fr 210px; height: 100vh; }
+      header { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--line); background: #12151b; }
       header h1 { font-size: 14px; margin: 0; }
-      .badge { padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 11px; color: #c3c8d3; }
+      .badge { padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 11px; color: #c3c8d3; white-space: nowrap; }
       .badge.ok { border-color: #2f8f5b; color: #7ee2a8; } .badge.warn { border-color: #b7791f; color: #f6c76b; } .badge.bad { border-color: #a33; color: #f88; }
       header .sp { flex: 1; }
       header label { font-size: 12px; color: #c3c8d3; display: flex; gap: 6px; align-items: center; }
       header a { color: #9fc4ff; font-size: 12px; }
-      main { display: grid; grid-template-columns: 1.2fr 1.3fr .9fr; gap: 1px; background: var(--line); min-height: 0; }
+      main { display: grid; grid-template-columns: 1.15fr 1.15fr 1fr; gap: 1px; background: var(--line); min-height: 0; }
       section { background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
-      section h2 { margin: 0; padding: 10px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+      section h2 { margin: 0; padding: 9px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
       section h2 i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
       .scroll { overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
       .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
       .card .t { font-size: 11px; color: var(--muted); margin-bottom: 3px; display: flex; justify-content: space-between; }
-      .card.brief { border-left: 3px solid #e0a83a; } .card.approval { border-left: 3px solid #2f6fed; } .card.lift { border-left: 3px solid #4fc27a; } .card.security { border-left: 3px solid #e05a4f; } .card.info { border-left: 3px solid #556; }
+      .card.brief { border-left: 3px solid #e0a83a; } .card.approval { border-left: 3px solid #2f6fed; } .card.lift { border-left: 3px solid #4fc27a; } .card.alert { border-left: 3px solid #e05a4f; } .card.report { border-left: 3px solid #c58ccf; } .card.info { border-left: 3px solid #556; }
+      .card.reply { border-left: 3px solid var(--tg); background: #142433; }
+      .card img { width: 100%; border-radius: 6px; margin-top: 6px; display: block; }
       .actions { display: flex; gap: 8px; margin-top: 8px; }
       button { background: #2a2f3a; color: #e6e6e6; border: 1px solid #3a4150; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
       button.primary { background: #2f6fed; border-color: #2f6fed; color: #fff; } button.danger { background: #8e2419; border-color: #8e2419; color: #fff; }
       button:disabled { opacity: .5; cursor: default; }
+      .compose { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+      .compose input { flex: 1; min-width: 120px; background: #0f1116; border: 1px solid var(--line); color: #e6e6e6; border-radius: 5px; padding: 5px 7px; font-size: 12px; }
       .phones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 12px; overflow-y: auto; }
-      .phone { background: var(--card); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-height: 220px; max-height: 320px; }
-      .phone .top { padding: 8px 10px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; font-weight: 600; }
-      .phone .top span { font-size: 10px; font-weight: 400; color: var(--muted); }
-      .phone .top span.in { color: #7ee2a8; }
+      .phone { background: var(--card); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-height: 200px; max-height: 300px; }
+      .phone .top { padding: 7px 10px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; font-weight: 600; }
+      .phone .top span { font-size: 10px; font-weight: 400; color: var(--muted); } .phone .top span.in { color: #7ee2a8; }
       .phone .msgs { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
-      .bub { max-width: 85%; padding: 6px 8px; border-radius: 10px; font-size: 12px; line-height: 1.3; }
-      .bub.out { align-self: flex-start; background: #232833; } .bub.in { align-self: flex-end; background: #1f5c8a; }
+      .bub { max-width: 88%; padding: 6px 8px; border-radius: 10px; font-size: 12px; line-height: 1.3; }
+      .bub.out { align-self: flex-start; background: #233a2a; } .bub.in { align-self: flex-end; background: #1f5c8a; }
       .phone form { display: flex; gap: 4px; padding: 6px; border-top: 1px solid var(--line); flex-wrap: wrap; }
-      .phone input { flex: 1; min-width: 90px; background: #0f1116; border: 1px solid var(--line); color: #e6e6e6; border-radius: 5px; padding: 4px 6px; font-size: 12px; }
+      .phone input { flex: 1; min-width: 80px; background: #0f1116; border: 1px solid var(--line); color: #e6e6e6; border-radius: 5px; padding: 4px 6px; font-size: 12px; }
       .phone .pre { font-size: 10px; padding: 3px 6px; }
-      .pos-tot { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 10px 12px; }
-      .stat { background: var(--card); border-radius: 6px; padding: 8px; } .stat .v { font-size: 18px; font-weight: 600; } .stat .l { font-size: 10px; color: var(--muted); }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+      th { color: var(--muted); font-weight: 500; font-size: 11px; }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; }
+      td.warn { color: #f6c76b; } td.bad { color: #f88; }
+      td button { padding: 1px 6px; font-size: 11px; }
+      .inv-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+      .pos-tot { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 8px 12px; }
+      .stat { background: var(--card); border-radius: 6px; padding: 6px 8px; } .stat .v { font-size: 16px; font-weight: 600; } .stat .l { font-size: 10px; color: var(--muted); }
       .ring { display: flex; gap: 6px; padding: 0 12px 8px; }
-      .ring input { width: 80px; background: #0f1116; border: 1px solid var(--line); color: #e6e6e6; border-radius: 5px; padding: 4px 6px; }
-      .sale { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
-      .sale .code { color: #f6c76b; }
+      .ring input { width: 76px; background: #0f1116; border: 1px solid var(--line); color: #e6e6e6; border-radius: 5px; padding: 4px 6px; }
       .report { padding: 8px 12px; border-top: 1px solid var(--line); font-size: 12px; color: #c3c8d3; }
       .report b { color: #fff; }
       footer { border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
       #trace { overflow-y: auto; font-family: ui-monospace, Menlo, monospace; font-size: 11px; padding: 6px 10px; }
       #trace div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 0; }
-      #trace .from { display: inline-block; width: 170px; color: var(--muted); } #trace .topic { display: inline-block; width: 210px; }
-      .f-sim { color: #9fc4ff } .f-pos { color: #f6c76b } .f-sensing { color: #7ee2a8 } .f-manager { color: #e0a83a } .f-marketing { color: #e66fd2 } .f-messaging { color: #2aabee } .f-router { color: #999 } .f-console { color: #ccc } .f-slack { color: #c58ccf } .f-telegram { color: #2aabee }
+      #trace .from { display: inline-block; width: 190px; color: var(--muted); } #trace .topic { display: inline-block; width: 220px; }
+      .f-sim { color: #9fc4ff } .f-pos { color: #f6c76b } .f-analytics { color: #7ee2a8 } .f-manager { color: #e0a83a } .f-campaign { color: #e66fd2 } .f-communication { color: #34c759 } .f-inventory { color: #f28c5d } .f-owner { color: #2aabee } .f-router { color: #999 } .f-console { color: #ccc }
       aside { border-left: 1px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
       aside .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
       aside h3 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+      .split { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; flex: 1; }
     </style>
   </head>
   <body>
@@ -63,31 +72,47 @@
       <h1>Comms Console</h1>
       <span class="badge" id="b-conn">mesh: connecting…</span>
       <span class="badge" id="b-prov">brain: –</span>
-      <span class="badge" id="b-adapters">slack: – · telegram: –</span>
+      <span class="badge" id="b-img">images: –</span>
+      <span class="badge" id="b-adapters">owner: – · comms: –</span>
       <span class="sp"></span>
-      <label><input type="checkbox" id="force-offline"> Simulate offline (force local brain)</label>
+      <label><input type="checkbox" id="force-offline"> Simulate offline</label>
       <a href="/" target="_blank">Sim</a>
       <a href="/tv.html" target="_blank">TV</a>
     </header>
     <main>
       <section>
-        <h2><i style="background:var(--slack)"></i> Slack · #storefront-ops (owner)</h2>
-        <div class="scroll" id="slack"></div>
-      </section>
-      <section>
-        <h2><i style="background:var(--tg)"></i> Telegram · customers</h2>
-        <div class="phones" id="phones"></div>
-      </section>
-      <section>
-        <h2><i style="background:#f6c76b"></i> Mock POS</h2>
-        <div class="pos-tot">
-          <div class="stat"><div class="v" id="pos-n">0</div><div class="l">sales</div></div>
-          <div class="stat"><div class="v" id="pos-rev">$0</div><div class="l">revenue</div></div>
-          <div class="stat"><div class="v" id="pos-promo">0</div><div class="l">promo redemptions</div></div>
+        <h2><i style="background:var(--tg)"></i> Owner · Telegram (manager agent only)</h2>
+        <div class="scroll" id="owner"></div>
+        <div class="compose">
+          <input id="o-text" placeholder="Reply as the owner…">
+          <button id="o-send">Send</button>
+          <button class="primary" data-say="approve">Approve</button>
+          <button class="danger" data-say="reject">Reject</button>
+          <button data-say="report">Report</button>
+          <button data-say="status">Status</button>
         </div>
-        <div class="ring"><input id="ring-amt" type="number" value="12.50" step="0.25" min="0"><input id="ring-code" placeholder="promo code"><button id="ring-btn">Ring up sale</button></div>
-        <div class="scroll" id="sales"></div>
-        <div class="report" id="report">Waiting for the first sensing report…</div>
+      </section>
+      <section>
+        <h2><i style="background:var(--im)"></i> Customers · iMessage / notifications (communication agent)</h2>
+        <div class="phones" id="phones"></div>
+        <div class="report" id="notify-log">No notifications yet.</div>
+      </section>
+      <section class="split">
+        <div>
+          <div class="inv-head"><span style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Inventory · day <b id="inv-day">0</b></span><button id="inv-day-btn">Advance day</button></div>
+          <div style="overflow:auto; max-height: 240px"><table id="inv"><thead><tr><th>Item</th><th>Qty</th><th>Par</th><th>Expires</th><th></th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div style="min-height:0; display:flex; flex-direction:column">
+          <h2><i style="background:#f6c76b"></i> Mock POS</h2>
+          <div class="pos-tot">
+            <div class="stat"><div class="v" id="pos-n">0</div><div class="l">sales</div></div>
+            <div class="stat"><div class="v" id="pos-rev">$0</div><div class="l">revenue</div></div>
+            <div class="stat"><div class="v" id="pos-promo">0</div><div class="l">redemptions</div></div>
+          </div>
+          <div class="ring"><input id="ring-amt" type="number" value="12.50" step="0.25" min="0"><input id="ring-code" placeholder="code"><button id="ring-btn">Ring up</button></div>
+          <div class="scroll" id="sales" style="padding-top:0"></div>
+        </div>
+        <div class="report" id="report">Waiting for the first analytics report…</div>
       </section>
     </main>
     <footer>
@@ -98,7 +123,7 @@
           <button data-sc="regular">Regular</button><button data-sc="rainy">Rainy</button><button data-sc="rush">Dinner rush</button><button data-sc="dead">Dead hours</button><button id="sim-reset">Reset sim</button>
         </div>
         <h3>Trace</h3>
-        <div class="row"><label><input type="checkbox" id="t-footfall"> show sim.footfall</label><label><input type="checkbox" id="t-llm" checked> show llm.call</label><button id="t-clear">Clear</button></div>
+        <div class="row"><label><input type="checkbox" id="t-footfall"> sim.footfall</label><label><input type="checkbox" id="t-llm" checked> llm.call</label><label><input type="checkbox" id="t-state"> inventory.state</label><button id="t-clear">Clear</button></div>
         <div style="color:var(--muted)">Every message on the mesh bus, newest at the bottom.</div>
       </aside>
     </footer>

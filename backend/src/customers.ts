@@ -2,13 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Bus } from './bus.ts';
 
-export interface Customer { chatId: string; name: string; optedIn: boolean }
+export interface Customer { chatId: string; name: string; optedIn: boolean; phone?: string }
 
 const SEED: Customer[] = [
-  { chatId: 'c1', name: 'Ava', optedIn: true },
-  { chatId: 'c2', name: 'Ben', optedIn: true },
-  { chatId: 'c3', name: 'Chloe', optedIn: true },
-  { chatId: 'c4', name: 'Dev', optedIn: false },
+  { chatId: 'c1', name: 'Ava', optedIn: true, phone: '+14155550101' },
+  { chatId: 'c2', name: 'Ben', optedIn: true, phone: '+14155550102' },
+  { chatId: 'c3', name: 'Chloe', optedIn: true, phone: '+14155550103' },
+  { chatId: 'c4', name: 'Dev', optedIn: false, phone: '+14155550104' },
 ];
 
 /** Opt-in registry persisted as JSON; mirrors changes to the bus for the console. */
@@ -29,6 +29,6 @@ export class Customers {
   }
   save() {
     if (this.path) { try { mkdirSync(dirname(this.path), { recursive: true }); writeFileSync(this.path, JSON.stringify(this.list, null, 2)); } catch { /* ignore */ } }
-    this.bus.publish('messaging', 'customers.updated', { customers: this.all() });
+    this.bus.publish('communication', 'customers.updated', { customers: this.all() });
   }
 }
